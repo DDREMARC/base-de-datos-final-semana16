@@ -44,4 +44,5 @@ INSERT INTO menu_platos (codigo, nombre, descripcion, categoria, precio, ingredi
 ('CHI-011','Helado de Lúcuma','Dos bolas de lúcuma cremosa con barquillo.','Dulces',10.00,'Lúcuma, leche, azúcar, barquillo','S'),
 ('CHI-012','Alfajor Chino','Galleta rellena de manjar blanco, receta de la casa.','Dulces',6.00,'Harina, manjar blanco, azúcar glas, coco rallado','S');
 
+
 COMMIT;
