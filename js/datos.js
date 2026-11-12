@@ -1,19 +1,66 @@
 /* ============ CAPA DE DATOS ============
-   Hoy: localStorage + genera el SQL Oracle equivalente en el panel "SQL".
-   Mañana: cambiar insert/update/remove/list por fetch() a un backend que hable con Oracle
-   (PHP con oci8, Node con oracledb, o Java JDBC). La vista no cambia.
+   Dos modos, se elige con USAR_ORACLE:
+   - false: guarda en el navegador (localStorage). Sirve para la demo sin servidor.
+   - true : habla con Oracle a través de api/api.php (PHP + oci8 en XAMPP).
+   En los dos modos se anota el SQL Oracle equivalente en la pestaña "SQL Oracle".
 */
+const USAR_ORACLE = false;
+const API_URL = 'api/api.php';
+
 const api = {
   key: 'tiosam_db', logKey: 'tiosam_sql',
   db: null, log: [],
-  load(){ try{ this.db = JSON.parse(localStorage.getItem(this.key)); this.log = JSON.parse(localStorage.getItem(this.logKey))||[]; }catch(e){} if(!this.db) this.reset(); },
-  save(){ localStorage.setItem(this.key, JSON.stringify(this.db)); localStorage.setItem(this.logKey, JSON.stringify(this.log)); },
-  reset(){ this.db = JSON.parse(JSON.stringify(SEED)); this.log=[]; this.save(); },
+
+  // Llama al PHP y devuelve el JSON. Si Oracle rechaza algo, lanza el mensaje de error.
+  async pedir(url, metodo = 'GET', cuerpo){
+    const r = await fetch(url, { method: metodo, headers: {'Content-Type':'application/json'}, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    const j = await r.json().catch(() => ({ error: 'El servidor no respondió JSON. ¿Está prendido Apache y habilitado oci8?' }));
+    if(!r.ok) throw new Error(j.error || 'Error del servidor');
+    return j;
+  },
+
+  async load(){
+    try{ this.log = JSON.parse(localStorage.getItem(this.logKey)) || []; }catch(e){ this.log = []; }
+    if(USAR_ORACLE){
+      this.db = {};
+      for(const t of Object.keys(SEED)) this.db[t] = await this.pedir(`${API_URL}?tabla=${t}`);
+      return;
+    }
+    try{ this.db = JSON.parse(localStorage.getItem(this.key)); }catch(e){}
+    if(!this.db){ this.db = JSON.parse(JSON.stringify(SEED)); this.save(); }
+  },
+  save(){
+    if(!USAR_ORACLE) localStorage.setItem(this.key, JSON.stringify(this.db));
+    localStorage.setItem(this.logKey, JSON.stringify(this.log));
+  },
+  async reset(){
+    this.log = [];
+    if(!USAR_ORACLE){ this.db = JSON.parse(JSON.stringify(SEED)); this.save(); return; }
+    this.save(); await this.load();
+  },
+
   list(t){ return this.db[t]; },
-  insert(t,row){ const rows=this.db[t]; row.id = rows.length ? Math.max(...rows.map(r=>r.id))+1 : 1; rows.push(row); this.sql(sqlInsert(t,row)); return row; },
-  update(t,id,row){ const i=this.db[t].findIndex(r=>r.id==id); this.db[t][i] = {...this.db[t][i],...row,id}; this.sql(sqlUpdate(t,id,row)); },
-  remove(t,id){ this.db[t] = this.db[t].filter(r=>r.id!=id); this.sql(`DELETE FROM ${t} WHERE id = ${id};`); },
   get(t,id){ return this.db[t].find(r=>r.id==id); },
+
+  async login(usuario, clave){
+    if(USAR_ORACLE) return this.pedir(`${API_URL}?accion=login`, 'POST', {usuario, clave});
+    const u = this.list('usuarios').find(x=>x.usuario===usuario && x.clave===clave && x.activo==='S');
+    if(!u) throw new Error('Usuario o contraseña incorrectos');
+    return u;
+  },
+  async insert(t,row){
+    if(USAR_ORACLE){ row = await this.pedir(`${API_URL}?tabla=${t}`, 'POST', row); }
+    else { const rows=this.db[t]; row.id = rows.length ? Math.max(...rows.map(r=>r.id))+1 : 1; }
+    this.db[t].push(row); this.sql(sqlInsert(t,row)); return row;
+  },
+  async update(t,id,row){
+    if(USAR_ORACLE) await this.pedir(`${API_URL}?tabla=${t}&id=${id}`, 'PUT', row);
+    const i=this.db[t].findIndex(r=>r.id==id); this.db[t][i] = {...this.db[t][i],...row,id:Number(id)}; this.sql(sqlUpdate(t,id,row));
+  },
+  async remove(t,id){
+    if(USAR_ORACLE) await this.pedir(`${API_URL}?tabla=${t}&id=${id}`, 'DELETE');
+    this.db[t] = this.db[t].filter(r=>r.id!=id); this.sql(`DELETE FROM ${t} WHERE id = ${id};`);
+  },
   sql(s){ this.log.push(s); this.save(); },
 };
 /* SQL Oracle: fechas con TO_DATE, textos con comillas simples dobladas, NULL real */
@@ -82,7 +129,7 @@ const SEED = {
   pagos: [
     {id:1,pedido_id:1,metodo:'Efectivo',monto:56,fecha:'2026-11-11',estado:'Pagado'},
     {id:2,pedido_id:2,metodo:'Yape/Plin',monto:27,fecha:'2026-11-11',estado:'Pagado'},
-    {id:3,pedido_id:3,metodo:'Tarjeta',monto:108,fecha:'2026-11-11',estado:'Pendiente'},
+    {id:3,pedido_id:3,metodo:'Tarjeta',monto:112,fecha:'2026-11-11',estado:'Pendiente'},
   ],
 };
 

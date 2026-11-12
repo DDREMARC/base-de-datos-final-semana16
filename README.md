@@ -26,8 +26,32 @@ Los cambios se guardan en el navegador. La pestaña **SQL Oracle** muestra el
 2. Ejecutar `sql/tio_sam_oracle.sql` completo (F5).
 3. Al final imprime los constraints por tabla y la vista `v_resumen_dia`.
 
-## Conectar el panel a Oracle (siguiente paso)
+## Conectar el panel a Oracle
 
-Cambiar en `js/datos.js` las funciones `api.list / insert / update / remove`
-por `fetch()` a un backend (PHP con oci8, Node con oracledb o Java JDBC).
-La interfaz no cambia.
+El navegador no puede hablar con Oracle directo. El camino es:
+
+`index.html` + `js/` → `api/api.php` (PHP en XAMPP) → Oracle
+
+| Archivo | Qué hace |
+|---|---|
+| `api/conexion.php` | Usuario, clave y cadena de conexión a Oracle. |
+| `api/api.php` | Recibe los pedidos del panel y ejecuta SELECT / INSERT / UPDATE / DELETE. |
+
+### Pasos
+
+1. **Crear la base.** Ejecutar `sql/tio_sam_oracle.sql` en Oracle 12c o superior.
+2. **Copiar el proyecto a XAMPP.** Toda la carpeta dentro de `C:\xampp\htdocs\tio-sam\`.
+3. **Habilitar oci8 en PHP.**
+   - Instalar Oracle Instant Client (Basic, 64 bits) y agregar su carpeta al `PATH` de Windows.
+   - En `C:\xampp\php\php.ini`, quitar el `;` de la línea `extension=oci8_19` (o `oci8_12c`, según la versión).
+   - Reiniciar Apache. Comprobar en `http://localhost/dashboard/phpinfo.php` que aparece la sección **oci8**.
+4. **Poner tus datos** en `api/conexion.php` (usuario, clave, cadena `//host:1521/servicio`).
+5. **Probar el puente.** Abrir `http://localhost/tio-sam/api/api.php?tabla=clientes`. Debe salir una lista JSON.
+6. **Activar el modo Oracle.** En `js/datos.js` cambiar `const USAR_ORACLE = false;` a `true`.
+7. Abrir `http://localhost/tio-sam/`. Arriba debe decir **Oracle** en verde.
+
+Importante: se abre con `http://localhost/...`, no con doble clic al archivo.
+Con `USAR_ORACLE = false` el panel sigue funcionando solo, sin servidor.
+
+Las reglas las pone Oracle: si un CHECK, UNIQUE o llave foránea rechaza el cambio,
+el panel muestra el motivo.

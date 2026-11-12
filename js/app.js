@@ -56,8 +56,8 @@ function render(){
   const sc = SCHEMA[S.tab];
   $('#app').innerHTML = `
   <header><div class="logo">TS</div><h1>El Tío Sam Chifa<small>Panel de administración</small></h1>
-    <div class="der"><span>${esc(S.user.usuario)} · ${S.user.rol}</span>
-      <button class="btn g xs" onclick="if(confirm('¿Volver a los datos iniciales?')){api.reset();render();toast('Datos reiniciados')}">Reiniciar datos</button>
+    <div class="der"><span class="pill ${USAR_ORACLE?'ok':''}">${USAR_ORACLE?'Oracle':'Navegador'}</span><span>${esc(S.user.usuario)} · ${S.user.rol}</span>
+      <button class="btn g xs" onclick="reiniciar()">${USAR_ORACLE?'Recargar de Oracle':'Reiniciar datos'}</button>
       <button class="btn s xs" style="background:transparent;color:#fff;border-color:#fff" onclick="S.user=null;render()">Salir</button></div></header>
   <div class="tabs">${tabs}</div>
   <main>${sc.vista ? renderVista() : sc.sqlLog ? renderSql() : renderTabla(sc)}</main>`;
@@ -128,14 +128,19 @@ function renderLogin(){
 /* ============ ACCIONES ============ */
 function go(t){ S.tab=t; S.edit=null; S.q=''; render(); }
 function editar(id){ S.edit=id; render(); }
-function borrar(id){
+async function reiniciar(){
+  if(!USAR_ORACLE && !confirm('¿Volver a los datos iniciales?')) return;
+  try{ await api.reset(); render(); toast(USAR_ORACLE?'Datos recargados':'Datos reiniciados'); }catch(err){ toast(err.message); }
+}
+async function borrar(id){
   const t=S.tab, deps={clientes:['pedidos','cliente_id'],empleados:['pedidos','empleado_id'],mesas:['pedidos','mesa_id'],
     menu_platos:['detalle_pedido','plato_id'],pedidos:['detalle_pedido','pedido_id']}[t];
   if(deps && api.list(deps[0]).some(r=>r[deps[1]]==id)) return toast(`No se puede: ${deps[0]} usa este registro (FK)`);
   if(!confirm('¿Borrar registro #'+id+'?')) return;
-  api.remove(t,id); if(S.edit==id) S.edit=null; render(); toast('Borrado');
+  try{ await api.remove(t,id); }catch(err){ return toast(err.message); }
+  if(S.edit==id) S.edit=null; render(); toast('Borrado');
 }
-function guardar(e){
+async function guardar(e){
   e.preventDefault(); const t=S.tab, sc=SCHEMA[t], fd=new FormData(e.target), row={};
   for(const f of sc.f){ if(f.calc) continue; let v=fd.get(f.k);
     if(f.type==='num') v = v===''?null:Number(v); else if(f.type==='fk') v = v===''?null:Number(v);
@@ -146,15 +151,20 @@ function guardar(e){
   const uniq={menu_platos:'codigo',clientes:'dni',empleados:'dni',usuarios:'usuario',mesas:'numero'}[t];
   if(uniq && api.list(t).some(r=>r[uniq]==row[uniq] && r.id!=S.edit)) return toast(uniq+' ya existe (UNIQUE)');
   if(t==='detalle_pedido' && !S.edit){ const p=api.get('menu_platos',row.plato_id); if(p && !fd.get('precio_unitario')) row.precio_unitario=p.precio; }
-  if(S.edit){ api.update(t,S.edit,row); toast('Actualizado #'+S.edit); S.edit=null; }
-  else { const r=api.insert(t,row); toast('Agregado #'+r.id); }
+  try{
+    if(S.edit){ await api.update(t,S.edit,row); toast('Actualizado #'+S.edit); S.edit=null; }
+    else { const r=await api.insert(t,row); toast('Agregado #'+r.id); }
+  }catch(err){ return toast(err.message); }
   render();
 }
-function login(e){
+async function login(e){
   e.preventDefault(); const fd=new FormData(e.target);
-  const u=api.list('usuarios').find(x=>x.usuario===fd.get('u') && x.clave===fd.get('c') && x.activo==='S');
-  if(!u){ $('#err').textContent='Usuario o contraseña incorrectos'; return; }
-  S.user=u; render(); toast('Bienvenido, '+u.usuario);
+  try{ S.user = await api.login(fd.get('u'), fd.get('c')); }
+  catch(err){ $('#err').textContent = err.message; return; }
+  render(); toast('Bienvenido, '+S.user.usuario);
 }
 
-api.load(); render();
+api.load().then(render).catch(err=>{
+  $('#app').innerHTML = `<div class="login"><div class="caja"><h2>Sin conexión</h2><p>${esc(err.message)}</p>
+    <div class="nota">Revisa que Apache esté prendido, que oci8 esté habilitado y los datos de <b>api/conexion.php</b>.</div></div></div>`;
+});
