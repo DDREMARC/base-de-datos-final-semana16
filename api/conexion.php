@@ -12,7 +12,7 @@
 
 $usuario_bd = 'tiosam';
 $clave_bd   = 'tiosam123';
-$cadena_bd  = '//localhost:1521/XEPDB1';
+$cadena_bd  = '//localhost:1521/XE';   // Oracle XE 11.2 local. En 18c/21c sería XEPDB1
 
 $conexion = @oci_connect($usuario_bd, $clave_bd, $cadena_bd, 'AL32UTF8');
 

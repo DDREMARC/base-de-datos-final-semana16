@@ -39,7 +39,8 @@ El navegador no puede hablar con Oracle directo. El camino es:
 
 ### Pasos
 
-1. **Crear la base.** Ejecutar `sql/tio_sam_oracle.sql` en Oracle 12c o superior.
+1. **Crear la base.** Con Oracle 12c o superior: `sql/tio_sam_oracle.sql`.
+   Con Oracle XE 11.2: `sql/tio_sam_oracle_11g.sql` (mismo esquema, el id usa secuencia + trigger).
 2. **Copiar el proyecto a XAMPP.** Toda la carpeta dentro de `C:\xampp\htdocs\tio-sam\`.
 3. **Habilitar oci8 en PHP.**
    - Instalar Oracle Instant Client (Basic, 64 bits) y agregar su carpeta al `PATH` de Windows.
