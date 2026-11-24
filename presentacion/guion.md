@@ -2,17 +2,20 @@
 
 Formato: 10 min de diapositivas, hablado. Después, cada integrante corre **una** query en vivo (aparte de los 10 min).
 Ritmo: unas 130 palabras por minuto. Cada bloque abajo ya está medido.
-Datos tomados del informe. Lo que no está en el informe va marcado **[VERIFICAR]**.
+Datos tomados del informe y del script Oracle (tio_sam_oracle.sql).
 
 | Bloque | Quién | Diapositivas | Tiempo |
 |---|---|---|---|
-| Apertura | Gabriel | 1–2 | 0:45 |
-| Parte 1 | Gabriel | 3–4 | 2:00 |
-| Parte 2 | Banda | 5–6 | 2:00 |
-| Parte 3 | Bustinza | 7–8 | 1:45 |
-| Parte 4 | Toledo | 9–10 | 2:00 |
-| Cierre | Toledo | 11 | 0:30 |
-| Margen | — | — | 1:00 |
+| Apertura | Gabriel | 1 | 0:45 |
+| Parte 1 | Gabriel | 2–3 | 1:45 |
+| Parte 2 | Banda | 4–5 | 2:15 |
+| Parte 3 | Bustinza | 6–7 | 1:45 |
+| Parte 4 | Toledo | 8–9 | 1:45 |
+| Cierre | Toledo | 10 | 0:30 |
+| Margen | — | — | 1:15 |
+
+Por persona: Gabriel 2:30 (apertura y parte 1), Banda 2:15, Bustinza 1:45, Toledo 2:15 (parte 4 y cierre). Total 10:00. Las cuatro consultas en vivo (diapositivas 11 a 14) quedan fuera de los 10 minutos.
+Cronometrar con todo el grupo. Si pasan de 10 min, recorten los ejemplos de consultas.
 
 ---
 
@@ -26,7 +29,7 @@ Al final cada uno corre una consulta en vivo.
 
 ---
 
-## Parte 1 · Gabriel · 2:00 · "La carta y la puerta de entrada"
+## Parte 1 · Gabriel · 1:45 · "La carta y la puerta de entrada"
 
 Empiezo por el prototipo. Es una página clicable con 9 pantallas: login, catálogo, modificar un plato, clientes, pedidos, detalle, pagos, resumen del día y el SQL que se genera. *(Mostrar la captura del catálogo, Fig 2.)*
 
@@ -42,7 +45,7 @@ Mis consultas son de la 1 a la 6. Por ejemplo, la Q2 busca los platos que cuesta
 
 ---
 
-## Parte 2 · Banda · 2:00 · "Quién compra y quién atiende"
+## Parte 2 · Banda · 2:15 · "Quién compra y quién atiende"
 
 Gracias. Yo les muestro los dos diagramas.
 
@@ -55,6 +58,8 @@ Mis dos tablas:
 **`clientes`** guarda el DNI, que tiene 8 dígitos y es único, para que no se repita un cliente.
 
 **`empleados`** guarda el cargo. Solo se permiten cuatro: Cocinero, Mozo, Cajero y Administrador. Eso lo controla una restricción CHECK.
+
+El curso pedía hasta 2FN, y el diseño la cumple y además llega a 3FN. Cada tabla tiene una llave primaria de un solo campo, el id, así que todo atributo depende de la llave completa: eso es 2FN. No hay dependencias transitivas, salvo una que conviene decir: `usuarios.rol` se deduce de `cliente_id` o `empleado_id`.
 
 Mis consultas son de la 7 a la 12. La Q7 saca mínimo, máximo y promedio de precio por categoría. La Q11 calcula el total de cada pedido.
 
@@ -76,7 +81,7 @@ Mis consultas son de la 13 a la 17. La Q13 muestra los platos que nunca se pidie
 
 ---
 
-## Parte 4 · Toledo · 2:00 · "Del pedido al cobro"
+## Parte 4 · Toledo · 1:45 · "Del pedido al cobro"
 
 Cierro el recorrido.
 
@@ -85,8 +90,6 @@ Cierro el recorrido.
 **`pagos`** guarda cada cobro, ligado a su pedido. Se paga en Efectivo, Tarjeta o Yape/Plin, y el estado puede ser Pagado, Pendiente o Anulado.
 
 Mis consultas son de la 18 a la 20. La Q19 muestra los platos más vendidos, y la Q20 suma lo cobrado por método de pago: Efectivo S/ 96, Tarjeta S/ 68 y Yape/Plin S/ 27.
-
-*(No incluir la demo de INSERT con total S/ 42 hasta probarla en Oracle. **[VERIFICAR]**)*
 
 ---
 
@@ -100,7 +103,7 @@ Gracias. Ahora cada uno corre una consulta en vivo, y después respondemos pregu
 
 ## Consultas en vivo (fuera de los 10 min)
 
-Una por persona. Elijan una que ya hayan corrido en Oracle 12c o superior. **[VERIFICAR]** con captura de respaldo.
+Una por persona. Correrla antes en Oracle 12c o superior y llevar una captura de respaldo. Nada de este SQL se ha ejecutado en Oracle todavía.
 
 | Quién | Sugerida | Qué muestra |
 |---|---|---|
@@ -114,12 +117,7 @@ Una por persona. Elijan una que ya hayan corrido en Oracle 12c o superior. **[VE
 - **¿Por qué no hay total en `pedidos`?** Para no repetir datos. Si cambia una línea, el total se recalcula solo.
 - **¿Por qué `mesa_id` puede ser nulo?** Un pedido para llevar no tiene mesa. La regla pide mesa solo en modalidad Mesa.
 - **¿Por qué un plato no se repite en un pedido?** Por el UNIQUE (pedido, plato). Las porciones van en `cantidad`.
-- **¿Por qué `precio_unitario`?** Para conservar el precio cobrado aunque la carta cambie. Es una excepción a la normalización, decidida a propósito.
+- **¿Por qué `precio_unitario`?** Para conservar el precio cobrado aunque la carta cambie. Es una copia deliberada: el precio cambia con el tiempo, así que no depende solo del plato, y por eso no rompe 2FN ni 3FN.
+- **¿Cumple 3FN?** Cumple 2FN (lo que pidió el curso) y además 3FN. Hay dos excepciones: `usuarios.rol`, que se deduce de `cliente_id` o `empleado_id`, y `precio_unitario`, que repite el precio de la carta a propósito.
 - **¿Qué pasa al borrar un pedido?** No hay cascade. Primero se borran sus líneas de detalle.
 - **¿Qué cambió de la versión 1 a la 2?** Se agregó `usuarios`, `pagos` ahora depende de `pedidos`, `resumen_dia` pasó a ser una vista y se quitó `pedidos.total`.
-
-## Pendientes antes de exponer
-
-- **[VERIFICAR]** Ejecutar el SQL y las consultas en Oracle 12c o superior. Nada se probó ahí todavía.
-- **[VERIFICAR]** La profesora pidió normalización hasta 2FN. El informe dice 3FN. Decidan qué decir si preguntan.
-- Cronometrar con todo el grupo. Si pasan de 10 min, recorten los ejemplos de consultas.

@@ -66,7 +66,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 #count{font-family:var(--font-display);font-size:24px;color:#fff}
 
 /* ---------- notas (N) ---------- */
-.notes{position:absolute;left:96px;right:96px;bottom:84px;max-height:360px;overflow:auto;padding:22px 32px;background:rgba(12,12,12,.95);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;display:none;z-index:20}
+.notes{position:absolute;left:96px;right:96px;bottom:84px;max-height:600px;overflow:auto;padding:22px 32px;background:rgba(12,12,12,.95);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;display:none;z-index:20}
 .notes.on{display:block}
 .notes h5{margin:0 0 12px;font-family:var(--font-pix);font-size:20px;color:var(--accent-l);font-weight:700}
 #notes-body{margin:0;font-size:24px;line-height:1.3;color:#fff;white-space:pre-line}
@@ -183,6 +183,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .seg2 button{font-family:var(--font-pix);font-size:24px;padding:12px 24px 10px;background:#1E1E1E;color:#C6C6C6;box-shadow:inset 0 0 0 3px #3a3a3a}
 .seg2 button.on{background:var(--accent-l);color:#141414;box-shadow:none}
 .erd-cap{font-size:24px;color:#E6E6E6}
+.erd-claim{display:flex;flex-direction:column;justify-content:center;min-width:0;white-space:nowrap}
+.erd-claim b{font-family:var(--font-pix);font-weight:400;font-size:36px;line-height:1.15;color:#fff;text-shadow:3px 3px 0 #1E1E1E}
+.erd-claim .erd-cap{display:block;margin-top:2px;line-height:1.2}
 .erd-fig{position:absolute;left:0;right:0;top:84px;bottom:40px;padding:10px}
 .erd-fig .fig-img{background:#FBF4E8}
 .erd-notes{position:absolute;right:16px;bottom:16px;width:400px;padding:18px 22px;background:rgba(20,20,20,.94);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;display:grid;gap:12px}
@@ -281,9 +284,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   #stage{position:static!important;transform:none!important;width:1920px!important;height:auto!important;overflow:visible!important;background:none!important}
   .slide{position:relative!important;inset:auto!important;width:1920px!important;height:1080px!important;visibility:visible!important;opacity:1!important;transform:none!important;transition:none!important;animation:none!important;overflow:hidden!important;break-after:page;page-break-after:always}
   .slide:last-of-type{break-after:auto;page-break-after:auto}
-  .hud,.foot,.notes,#credits,.lb,.timer,.hotbar,.seg2,.erd-top,.zoomable::after,button{display:none!important}
+  .hud,.foot,.notes,#credits,.lb,.timer,.hotbar,.seg2,.erd-hint,.zoomable::after,button{display:none!important}
   .cover-title span{animation:none!important}
-  .erd-fig{top:0!important}
+  .erd-fig{top:84px!important}
   .bg svg,.bg-photo{filter:none!important}
   *{text-shadow:none!important}
 }
@@ -685,7 +688,10 @@ function renderErd(i, p){
           <button type="button" data-erd="mer" aria-pressed="false">MER</button>
           <button type="button" data-erd="der" class="on" aria-pressed="true">DER</button>
         </div>
-        <span class="erd-cap">Clic en la figura para ampliar</span>
+        <div class="erd-claim">
+          <b>Cumple 2FN (lo exigido) y además 3FN</b>
+          <span class="erd-cap">Excepciones: usuarios.rol y precio_unitario<span class="erd-hint"> · clic para ampliar</span></span>
+        </div>
         ${timerBtn(p)}
       </div>
       <figure class="shot-frame erd-fig zoomable" id="erd-frame" data-full="img/${esc(DECK.figs.der.file)}">
@@ -783,7 +789,7 @@ function renderClosing(i){
   const concl = [
     'El modelo de 8 entidades cubre el ciclo completo de un restaurante.',
     'UNIQUE, CHECK y FOREIGN KEY: Oracle rechaza DNI inválidos, precios negativos y mesas inexistentes.',
-    'Sin total guardado y con detalle N:M, no hay datos duplicados.'
+    'Sin total guardado: se calcula desde el detalle. Solo se repiten precio_unitario y usuarios.rol.'
   ];
   return shell(i, 'closing', p, `${bgHTML('plains')}
     <div class="wrap closing">
@@ -828,7 +834,7 @@ const SPEECH = [
   'Buenas. Somos Gabriel, Banda, Bustinza y Toledo. Les presentamos la base de datos de El Tío Sam Chifa, un restaurante chifa, hecha en Oracle. La base cubre el recorrido completo del negocio: alguien entra al sistema, mira la carta, hace un pedido y paga. Eso mismo seguiremos en la exposición, en cuatro partes. Yo empiezo con la carta y el acceso; Banda sigue con los diagramas; Bustinza, con mesas y pedidos; y Toledo cierra con el detalle y los pagos.',
   'Empiezo por el prototipo: una página web clicable con nueve pantallas. Esta es la del catálogo, la carta del restaurante. Detrás hay dos tablas mías. menu_platos es la carta: doce platos de prueba, con código, nombre, categoría y precio. usuarios es el acceso: cada usuario es cliente o empleado, nunca los dos. La agregamos en la versión 2, porque la primera no tenía login.',
   'Mis consultas van de la Q1 a la Q6: filtros, rangos, IN y valores nulos. La Q2 busca los platos entre S/ 20 y S/ 30, y salen cinco. La Q6 muestra los pedidos sin mesa, que son los de para llevar y delivery: el 2, el 4 y el 6. Ahora Banda les muestra cómo se conecta todo.',
-  'Yo reviso el modelo. El MER es el mapa del negocio: las entidades y sus relaciones. Un pedido pertenece a un cliente, lo atiende un empleado y puede tener una mesa. El DER baja ese mapa a tablas. Cada tabla tiene su llave primaria, el id, y sus llaves foráneas: pedidos.cliente_id apunta a clientes.id. Son 8 entidades y 8 tablas. clientes guarda el DNI, de 8 dígitos y único. empleados guarda el cargo, y por una restricción CHECK solo acepta Cocinero, Mozo, Cajero o Administrador.',
+  'Yo reviso el modelo. El MER es el mapa del negocio: las entidades y sus relaciones. Un pedido pertenece a un cliente, lo atiende un empleado y puede tener una mesa. El DER baja ese mapa a tablas. Cada tabla tiene su llave primaria, el id, y sus llaves foráneas: pedidos.cliente_id apunta a clientes.id. Son 8 entidades y 8 tablas. clientes guarda el DNI, de 8 dígitos y único. empleados guarda el cargo, y por una restricción CHECK solo acepta Cocinero, Mozo, Cajero o Administrador. El curso pedía hasta 2FN, y el diseño la cumple y además llega a 3FN. Cada tabla tiene una llave primaria de un solo campo, el id, así que todo atributo depende de la llave completa: eso es 2FN. No hay dependencias transitivas, salvo una que conviene decir: usuarios.rol se deduce de cliente_id o empleado_id.',
   'Mis consultas son de la Q7 a la Q12. La Q7 saca el precio mínimo, máximo y promedio por categoría. La Q11 calcula el total de cada pedido: suma cantidad por precio unitario desde el detalle, así que ningún total queda guardado. La Q12 cuenta pedidos por cliente e incluye a quien no pidió nada. Ahora Bustinza explica mesas y pedidos.',
   'Yo explico el centro del sistema. mesas guarda el número de mesa, que es único; hay tres zonas y tres estados. pedidos es la cabecera de cada pedido: quién compra, quién atiende, la fecha, la modalidad y el estado. Dos decisiones importantes. Primera: no guardamos el total. Se calcula sumando el detalle, así nunca queda desactualizado. Segunda: la mesa solo es obligatoria si el pedido es de modalidad Mesa. Los de para llevar no tienen mesa, y una restricción lo asegura.',
   'Mis consultas son de la Q13 a la Q17. La Q13 muestra los platos que nunca se pidieron: Kam Lu Wantán y Alfajor Chino. La Q14 usa una subconsulta escalar, la Q15 un IN, la Q16 un EXISTS, y la Q17 junta clientes y empleados con UNION. Ahora Toledo cierra el recorrido del pedido.',
@@ -839,28 +845,27 @@ const SPEECH = [
 
 const NOTES = [
   'GABRIEL · apertura y parte 1 · 2:30 en total.\n\n' + SPEECH[0] +
-    '\n\n[VERIFICAR] Los 2:30 por persona son una propuesta para cumplir los 10:00 del encargo. El informe no fija minutos.',
+    '\n\nLos 2:30 por persona son una propuesta para cumplir los 10:00 del encargo. El informe no fija minutos.',
   'GABRIEL · parte 1 (carta y acceso).\n\n' + SPEECH[1] +
-    '\n\n[VERIFICAR] El reparto decía prototipo en Figma con 5 pantallas (incluye registro). El informe describe una web HTML/CSS/JS con 9 capturas y sin registro. Confirmar qué se presenta. La figura 2 es un recorte del original: clic para verla completa. No decir que está conectado a Oracle en vivo hasta aclarar la API PHP que menciona la conclusión del informe.',
+    '\n\nSe muestra lo que describe el informe: una web HTML/CSS/JS con 9 capturas y sin registro. El reparto hablaba de un prototipo en Figma con 5 pantallas (con registro); esa versión no es la que se presenta. La figura 2 es un recorte del original: clic para verla completa. No decir que el prototipo está conectado a Oracle en vivo: la conclusión del informe menciona una API PHP que la exposición no explica.',
   'GABRIEL · consultas Q1 a Q6. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[2] +
     '\n\nConsulta en vivo de Gabriel: Q2, en la diapositiva 11. No cuenta en los 2:30.',
   'BANDA · parte 2 (MER y DER).\n\n' + SPEECH[3] +
-    '\n\nTeclas M y D para alternar MER y DER. Clic en la figura para ampliar (rueda, arrastrar, Esc).\n[VERIFICAR] Las figuras 10 y 11 vienen de img/; confirmar que estén dentro del .docx.\n[VERIFICAR] UQ del DER: la figura marca UQ en clientes.codigo, empleados.codigo y empleados.dni. Las tarjetas se ajustaron a esa figura, que suma 8 UNIQUE como el conteo de content.json (7 simples y 1 compuesta). Confirmar contra el SQL de la sección 4.1 del informe.',
+    '\n\nTeclas M y D para alternar MER y DER. Clic en la figura para ampliar (rueda, arrastrar, Esc).\nUQ: 8 en total, como en el script Oracle (7 simples y 1 compuesta en detalle_pedido).\nExcepción de normalización: usuarios.rol se deduce de cliente_id o empleado_id. La restricción ck_usuarios_uno la mantiene coherente.',
   'BANDA · consultas Q7 a Q12. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[4] +
     '\n\nConsulta en vivo de Banda: Q11, en la diapositiva 12. No cuenta en los 2:30.',
   'BUSTINZA · parte 3 (mesas y pedidos).\n\n' + SPEECH[5],
   'BUSTINZA · consultas Q13 a Q17. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[6] +
     '\n\nConsulta en vivo de Bustinza: Q13, en la diapositiva 13. No cuenta en los 2:30.',
   'TOLEDO · parte 4 (detalle y pagos).\n\n' + SPEECH[7] +
-    '\n\n[VERIFICAR] Normalización: el informe dice 3FN; el curso pedía hasta 2FN. precio_unitario es una decisión de diseño fuera de 3FN. Decidir qué decir si preguntan.',
+    '\n\nprecio_unitario es una copia deliberada del precio de la carta, tomada al momento de la venta. No depende solo del plato, porque el precio cambia con el tiempo, así que no rompe 2FN ni 3FN; aun así repite un dato de menu_platos, a propósito.',
   'TOLEDO · consultas Q18 a Q20. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[8] +
     '\n\nConsulta en vivo de Toledo: Q20, en la diapositiva 14. No cuenta en los 2:30.',
-  'TOLEDO · cierre (incluido en los 2:30 de Toledo).\n\n' + SPEECH[9] +
-    '\n\n[VERIFICAR] DEMO EN VIVO: quitada de la diapositiva. No viene en el informe y S/ 42 no sale de sus datos. Plan sin probar: INSERT de un pedido y su detalle (SQL real pendiente), COMMIT, SELECT p.id, d.cantidad, d.precio_unitario FROM pedidos p JOIN detalle_pedido d ON d.pedido_id = p.id, y SUM(cantidad * precio_unitario) = S/ 42. Probarla en Oracle antes de usarla.',
-  'EN VIVO · Gabriel · Q2. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
-  'EN VIVO · Banda · Q11. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
-  'EN VIVO · Bustinza · Q13. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
-  'EN VIVO · Toledo · Q20. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.'
+  'TOLEDO · cierre (incluido en los 2:30 de Toledo).\n\n' + SPEECH[9],
+  'EN VIVO · Gabriel · Q2. Fuera de los 2:30.\nTodavía no se ha corrido en Oracle 12c o superior: correrla antes de exponer y llevar captura de respaldo.',
+  'EN VIVO · Banda · Q11. Fuera de los 2:30.\nTodavía no se ha corrido en Oracle 12c o superior: correrla antes de exponer y llevar captura de respaldo.',
+  'EN VIVO · Bustinza · Q13. Fuera de los 2:30.\nTodavía no se ha corrido en Oracle 12c o superior: correrla antes de exponer y llevar captura de respaldo.',
+  'EN VIVO · Toledo · Q20. Fuera de los 2:30.\nTodavía no se ha corrido en Oracle 12c o superior: correrla antes de exponer y llevar captura de respaldo.'
 ];
 
 /* ==========================================================================
