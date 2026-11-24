@@ -1,0 +1,79 @@
+[
+  {
+    "fig": 1,
+    "file": "fig01-login.png",
+    "caption": "Figura 1. Pantalla de inicio de sesión (tabla usuarios).",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 2,
+    "file": "fig02-catalogo.png",
+    "caption": "Figura 2. Catálogo: carta del restaurante (tabla menu_platos).",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 3,
+    "file": "fig03-modificar-plato.png",
+    "caption": "Figura 3. Modificación de un plato: formulario «Editar #1» con validaciones.",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 4,
+    "file": "fig04-clientes.png",
+    "caption": "Figura 4. Mantenimiento de clientes.",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 5,
+    "file": "fig05-pedidos.png",
+    "caption": "Figura 5. Pedidos: cliente, empleado que atendió, mesa, modalidad, estado y total calculado.",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 6,
+    "file": "fig06-detalle.png",
+    "caption": "Figura 6. Detalle de pedido: platos, cantidades, precio unitario y subtotal.",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 7,
+    "file": "fig07-pagos.png",
+    "caption": "Figura 7. Pagos por método (Efectivo, Tarjeta, Yape/Plin).",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 8,
+    "file": "fig08-resumen-dia.png",
+    "caption": "Figura 8. Resumen del día (vista v_resumen_dia).",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 9,
+    "file": "fig09-sql.png",
+    "caption": "Figura 9. SQL de Oracle generado por las acciones del panel.",
+    "width": 1800,
+    "height": 1068
+  },
+  {
+    "fig": 10,
+    "file": "fig10-mer.png",
+    "caption": "Figura 10. Modelo Entidad-Relación de El Tío Sam Chifa.",
+    "width": 2000,
+    "height": 1078
+  },
+  {
+    "fig": 11,
+    "file": "fig11-der.png",
+    "caption": "Figura 11. Diagrama Entidad-Relación (8 tablas con sus campos, PK, FK y UQ).",
+    "width": 2000,
+    "height": 1078
+  }
+]

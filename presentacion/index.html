@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Tío Sam Chifa · Base de datos</title>
+<style>
+/* Monocraft (SIL OFL 1.1, Idrees Hassan): fuente local en fonts/, sin conexión externa */
+@font-face{font-family:'Monocraft';src:url(fonts/Monocraft.ttf) format('truetype');font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:'Monocraft';src:url(fonts/Monocraft-Bold.ttf) format('truetype');font-weight:700;font-style:normal;font-display:block}
+:root{
+  --grass:#5E9D34; --creeper:#4CAF50; --moss:#2E5A1C;
+  --ui-gray:#C6C6C6; --stone:#373737; --charcoal:#1E1E1E; --white:#FFFFFF;
+  --dirt:#79553A; --oak:#9C7F4E; --gold:#FFD700; --redstone:#FF6B57;
+  --accent:#5E9D34; --accent-l:#9BD46B; --on:#141414;
+  /* Fallbacks antiguos (Press Start 2P, Silkscreen, VT323) solo si Monocraft no carga */
+  --font-display:'Monocraft','Press Start 2P',monospace;
+  --font-pix:'Monocraft','Silkscreen',monospace;
+  --font-mono:'Monocraft','VT323',monospace;
+  --font-body:'Monocraft','VT323',monospace;
+  --s:1;
+}
+*{box-sizing:border-box}
+/* Sin ligaduras: Monocraft trae ligaduras para "--", "->", "==" que cambiarían el SQL */
+html,body{margin:0;height:100%;overflow:hidden;background:#0b0b0b;color:#fff;font-family:var(--font-body);font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+:focus-visible{outline:4px solid var(--gold);outline-offset:4px}
+#deck{position:fixed;inset:0;overflow:hidden}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform:translate(-50%,-50%) scale(var(--s));transform-origin:50% 50%;background:#1E1E1E;overflow:hidden;font-size:24px;line-height:1.3}
+#stage p,#stage h1,#stage h2,#stage h3,#stage h4,#stage figure,#stage dl,#stage dd,#stage ul,#stage ol{margin:0;padding:0}
+#stage ul,#stage ol{list-style:none}
+
+/* ---------- superficies tipo bloque ---------- */
+.stone{background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626}
+.dark{background:#1E1E1E;box-shadow:inset 0 0 0 4px #0B0B0B,inset 4px 4px 0 #2F2F2F,inset -4px -4px 0 #111}
+
+/* ---------- escenario de fondo ---------- */
+.slide{position:absolute;inset:0;overflow:hidden;visibility:hidden;opacity:0;transform:translateX(48px);transition:opacity .5s ease,transform .5s ease,visibility 0s linear .5s}
+.slide.is-active{visibility:visible;opacity:1;transform:none;transition:opacity .5s ease,transform .5s ease,visibility 0s}
+.slide.is-past{transform:translateX(-48px)}
+.bg{position:absolute;inset:0;overflow:hidden}
+.bg svg{position:absolute;left:-30px;top:-30px;width:calc(100% + 60px);height:calc(100% + 60px);filter:blur(3px) saturate(.92)}
+.bg-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62) saturate(.92)}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse 80% 70% at 50% 45%,rgba(0,0,0,.36) 0%,rgba(0,0,0,.66) 100%)}
+.wrap{position:absolute;left:96px;right:96px;top:150px;bottom:96px}
+
+/* ---------- HUD ---------- */
+.hud{position:absolute;left:0;right:0;top:0;height:112px;display:flex;align-items:center;gap:36px;padding:0 48px 0 56px;background:#2B2B2B;box-shadow:inset 0 -6px 0 #141414,inset 0 2px 0 #565656;z-index:10}
+.logo{display:flex;align-items:center;gap:18px;flex:none}
+.logo img{width:60px;height:60px;flex:none;image-rendering:pixelated}
+.logo-text{font-family:var(--font-display);font-size:36px;color:#fff;text-shadow:3px 3px 0 #2E5A1C,5px 5px 0 #141414;white-space:nowrap}
+.tracker{display:flex;gap:14px;margin-left:auto}
+.seg{position:relative;width:272px;height:88px;padding:12px 14px 18px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;text-align:left}
+.seg.current{background:#1E1E1E;box-shadow:inset 0 0 0 4px var(--accent)}
+.seg-top{display:block;font-family:var(--font-pix);font-size:24px;line-height:1.1;text-transform:uppercase;color:#fff;white-space:nowrap}
+.seg-sub{display:block;margin-top:4px;font-size:24px;line-height:1.1;color:#D6D6D6;white-space:nowrap}
+.seg-bar{position:absolute;left:0;right:0;bottom:0;height:10px;background:#141414}
+.seg-bar i{display:block;height:100%;width:calc(var(--p,0) * 100%);background:var(--accent)}
+.hud-cr{flex:none;width:72px;height:72px}
+.hud-cr button{width:72px;height:72px;display:block}
+.hud-cr img{display:block;width:72px;height:72px}
+
+/* ---------- pie ---------- */
+.foot{position:absolute;left:0;right:0;bottom:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 72px;background:#141414;box-shadow:inset 0 3px 0 #2d2d2d;font-family:var(--font-pix);font-size:18px;color:#C6C6C6;z-index:10;white-space:nowrap;gap:24px}
+.foot .hint{font-family:var(--font-body);color:#B5B5B5;font-size:18px}
+#count{font-family:var(--font-display);font-size:24px;color:#fff}
+
+/* ---------- notas (N) ---------- */
+.notes{position:absolute;left:96px;right:96px;bottom:84px;max-height:360px;overflow:auto;padding:22px 32px;background:rgba(12,12,12,.95);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;display:none;z-index:20}
+.notes.on{display:block}
+.notes h5{margin:0 0 12px;font-family:var(--font-pix);font-size:20px;color:var(--accent-l);font-weight:700}
+#notes-body{margin:0;font-size:24px;line-height:1.3;color:#fff;white-space:pre-line}
+
+/* ---------- titulares ---------- */
+.h-display{font-family:var(--font-display);font-weight:400;text-transform:uppercase;font-size:54px;line-height:1.2;color:#fff;text-shadow:4px 4px 0 #1E1E1E,8px 8px 0 #0b0b0b}
+.pend{font-family:var(--font-pix);font-size:22px;color:var(--gold);text-transform:uppercase}
+.k{font-family:var(--font-pix);font-size:20px;line-height:1;padding:5px 8px 4px;color:#141414;background:var(--gold);flex:none}
+.k-FK{background:var(--redstone)}
+.k-UQ{background:#7CD0FF}
+.k-PK{background:var(--gold)}
+
+/* ---------- carta de parte ---------- */
+.pcard{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:30px;height:120px;padding:0 24px 0 0;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;border-left:16px solid var(--accent)}
+.pcard-ico{width:96px;height:96px;flex:none;background:var(--accent);display:grid;place-items:center;box-shadow:inset -6px -6px 0 rgba(0,0,0,.25),inset 6px 6px 0 rgba(255,255,255,.18);margin-left:4px}
+.pcard-ico img{display:block;width:64px;height:64px;image-rendering:pixelated}
+.pcard-chip{font-family:var(--font-pix);font-size:24px;color:var(--accent-l);text-transform:uppercase;white-space:nowrap}
+.pcard-title{font-family:var(--font-display);font-weight:400;font-size:36px;line-height:1.25;margin-top:14px;color:#fff;white-space:nowrap}
+.pcard-txt{min-width:0}
+.pcard .timer{margin-left:auto}
+
+/* ---------- cronómetro ---------- */
+.timer{display:flex;align-items:center;gap:16px;padding:10px 18px;background:#1E1E1E;box-shadow:inset 0 0 0 3px var(--accent);flex:none}
+.t-min{font-family:var(--font-pix);font-size:24px;color:var(--accent-l);white-space:nowrap}
+.t-val{font-family:var(--font-mono);font-size:36px;line-height:1;color:#fff;min-width:120px;text-align:right}
+.timer.running .t-val{color:var(--gold)}
+.timer.over .t-val{color:var(--redstone)}
+
+/* ---------- código SQL ---------- */
+.code{margin:0;font-family:var(--font-mono);font-size:22px;line-height:1.4;color:#EDEDED;background:#121212;padding:14px 22px 14px 26px;border-left:8px solid var(--accent);white-space:pre-wrap;overflow:hidden}
+.code.big{font-size:24px;line-height:1.4;padding:12px 20px 12px 24px}
+.tk-kw{color:#FFD166}.tk-fn{color:#7CD0FF}.tk-str{color:#9BE15D}.tk-num{color:#FF9E8F}.tk-com{color:#9A9A9A;font-style:italic}.tk-id{color:#EDEDED}
+
+/* ---------- tarjetas de tabla ---------- */
+.tcard{display:flex;flex-direction:column;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;min-width:0}
+.tcard-h{display:flex;align-items:center;gap:20px;padding:16px 22px 16px;background:#2b2b2b;border-bottom:4px solid #1E1E1E}
+.tcard-h h4{font-family:var(--font-pix);font-weight:700;font-size:24px;color:#fff;white-space:nowrap}
+.tcard-h p{margin-top:8px;font-size:24px;line-height:1.3;color:#D6D6D6}
+.tcard-h .tc-ico{width:64px;height:64px;flex:none;padding:6px;background:#373737;box-shadow:inset 0 0 0 3px #1E1E1E,inset 3px 3px 0 #5C5C5C}
+.fields{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px 14px}
+.fchip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 10px;background:#1E1E1E;font-family:var(--font-mono);font-size:24px;color:#fff;white-space:nowrap}
+
+/* ---------- vía de vagonetas ---------- */
+.rail{position:absolute;left:0;right:0;height:150px}
+.track{position:absolute;left:0;right:0;top:84px;height:26px;background:linear-gradient(#b8b8b8,#b8b8b8) center 4px / 100% 6px no-repeat,repeating-linear-gradient(90deg,#6b4a2e 0 14px,transparent 14px 34px) center / 100% 18px no-repeat}
+.station{position:absolute;top:0;transform:translateX(-50%);width:260px;height:140px;text-align:center}
+.st-ico{display:block;width:72px;height:72px;margin:0 auto;padding:8px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C}
+.st-ico img{display:block;width:100%;height:100%;image-rendering:pixelated}
+.st-t{position:absolute;left:0;right:0;top:112px;font-family:var(--font-pix);font-size:24px;color:#D6D6D6;text-transform:uppercase}
+.station.lit .st-ico{box-shadow:inset 0 0 0 4px var(--accent-l),inset 4px 4px 0 #5C5C5C}
+.station.lit .st-t{color:var(--accent-l)}
+.cart{position:absolute;top:54px;transform:translateX(-50%);width:76px;height:56px;transition:left .5s ease}
+.cart svg{width:100%;height:100%;display:block}
+
+/* ---------- pixel art (img/mc) ---------- */
+.px{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+.chest{--k:6;display:block;width:calc(var(--k) * 14px);height:calc(var(--k) * 15px)}
+.chest i,.chest b{display:block;background:url(img/mc/item/chest.png) no-repeat;background-size:calc(var(--k) * 64px) calc(var(--k) * 64px);image-rendering:pixelated}
+.chest i{height:calc(var(--k) * 5px);background-position:calc(var(--k) * -14px) calc(var(--k) * -14px)}
+.chest b{height:calc(var(--k) * 10px);background-position:calc(var(--k) * -14px) calc(var(--k) * -33px)}
+.st-ico .chest{--k:4}
+.xp-orb{display:block;width:28px;height:28px;background:url(img/mc/item/experience_orb.png) 0 -28px / 112px 112px no-repeat;image-rendering:pixelated}
+.head{display:block;background-repeat:no-repeat;image-rendering:pixelated}
+.bullet{flex:none;width:44px;height:44px;padding:6px;background:#1E1E1E;box-shadow:inset 0 0 0 3px #0B0B0B,inset 3px 3px 0 #2F2F2F}
+.bullet img{display:block;width:100%;height:100%;image-rendering:pixelated}
+.bullet-l{width:28px;height:28px;flex:none;padding:0;box-shadow:none}
+
+/* ---------- capturas y figuras (zoom) ---------- */
+.shot-frame{position:relative;display:flex;flex-direction:column;min-height:0;padding:12px;background:#1E1E1E;box-shadow:inset 0 0 0 4px #0B0B0B,inset 4px 4px 0 #2F2F2F,inset -4px -4px 0 #111}
+.shot-frame .fig-img{flex:1;min-height:0;width:100%;height:100%;object-fit:contain;background:#1E1E1E;image-rendering:auto}
+.shot-frame figcaption{margin-top:10px;font-size:24px;line-height:1.3;color:#E6E6E6}
+.shot-frame.missing::after{content:'Imagen no encontrada';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--font-pix);font-size:24px;color:var(--gold);white-space:nowrap}
+.shot-frame.missing .fig-img{visibility:hidden}
+.zoomable{cursor:zoom-in}
+.zoomable::after{content:'';position:absolute;right:20px;top:20px;width:48px;height:48px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6' fill='none' stroke='%23000' stroke-width='4.5'/><path d='M14.5 14.5 L21 21' stroke='%23000' stroke-width='5' stroke-linecap='square'/><circle cx='10' cy='10' r='6' fill='rgba(20,20,20,.55)' stroke='%23fff' stroke-width='2.2'/><path d='M14.5 14.5 L20.5 20.5' stroke='%23fff' stroke-width='2.6' stroke-linecap='square'/></svg>") no-repeat center/contain;opacity:0;transition:opacity .2s ease;pointer-events:none}
+.zoomable:hover::after{opacity:.95}
+
+/* ---------- PORTADA ---------- */
+.cover-main{position:absolute;left:0;right:0;top:0;text-align:center}
+.cover-ico{width:110px;height:110px;margin:0 auto}
+.cover-ico img{display:block;width:110px;height:110px}
+.cover-title{margin-top:24px;font-family:var(--font-display);font-weight:400;font-size:90px;line-height:1.28;color:#F4F4F4;text-transform:uppercase;text-shadow:4px 4px 0 #373737,8px 8px 0 #1E1E1E,12px 12px 0 #0b0b0b}
+.cover-title span{display:block}
+.cover-sub{margin:34px auto 0;max-width:1300px;font-family:var(--font-pix);font-size:24px;line-height:1.5;color:#fff;text-shadow:2px 0 #1E1E1E,-2px 0 #1E1E1E,0 2px #1E1E1E,0 -2px #1E1E1E,3px 3px #1E1E1E}
+.cover-course{margin-top:22px;font-size:24px;color:#EDEDED;text-shadow:0 2px 0 #1E1E1E}
+.cover-team{margin-top:12px;font-size:24px;color:#fff;text-shadow:0 2px 0 #1E1E1E}
+.cover-timer{position:absolute;right:0;top:0}
+.ag{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.ag-t{position:relative;display:grid;grid-template-columns:72px 1fr;gap:18px;align-items:center;min-height:176px;padding:18px 20px 18px 22px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;border-left:14px solid var(--accent);cursor:pointer;text-align:left}
+.ag-t:hover{background:#414141}
+.ag-t .px{width:72px;height:72px}
+.ag-who{display:block;font-family:var(--font-pix);font-size:20px;color:var(--accent-l);text-transform:uppercase;white-space:nowrap}
+.ag-t h3{margin-top:10px;font-size:28px;font-weight:700;line-height:1.2;color:#fff}
+.ag-note{display:block;margin-top:8px;font-size:24px;color:#D6D6D6}
+
+/* ---------- PARTE 1 (prototipo) ---------- */
+.proto{position:absolute;left:0;right:0;top:148px;bottom:0;display:grid;grid-template-columns:1100px 1fr;gap:40px}
+.pl{display:flex;flex-direction:column;min-height:0;gap:16px}
+.hotbar{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;padding:10px;background:#1E1E1E;box-shadow:inset 0 0 0 4px #0B0B0B,inset 4px 4px 0 #2F2F2F,inset -4px -4px 0 #111;flex:none}
+.slot{position:relative;height:90px;display:grid;place-items:center;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626}
+.slot .px{width:56px;height:56px}
+.slot-n{position:absolute;left:6px;top:4px;font-family:var(--font-pix);font-size:20px;color:#fff;text-shadow:2px 2px 0 #000}
+.slot.on{box-shadow:inset 0 0 0 4px var(--gold)}
+.pl .shot-frame{flex:1;min-height:0}
+.side{display:flex;flex-direction:column;gap:20px;min-height:0}
+.side .lbl{font-family:var(--font-pix);font-size:24px;color:var(--accent-l)}
+.side .bl{flex:1}
+.bl{display:flex;align-items:center;gap:22px;padding:22px 26px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;font-size:30px;line-height:1.25;color:#fff}
+
+/* ---------- MER / DER (pantalla casi completa) ---------- */
+.erd-top{position:absolute;left:0;right:0;top:0;height:72px;display:flex;align-items:center;gap:20px}
+.erd-top .timer{margin-left:auto}
+.seg2{display:flex;gap:10px}
+.seg2 button{font-family:var(--font-pix);font-size:24px;padding:12px 24px 10px;background:#1E1E1E;color:#C6C6C6;box-shadow:inset 0 0 0 3px #3a3a3a}
+.seg2 button.on{background:var(--accent-l);color:#141414;box-shadow:none}
+.erd-cap{font-size:24px;color:#E6E6E6}
+.erd-fig{position:absolute;left:0;right:0;top:84px;bottom:40px;padding:10px}
+.erd-fig .fig-img{background:#FBF4E8}
+.erd-notes{position:absolute;right:16px;bottom:16px;width:400px;padding:18px 22px;background:rgba(20,20,20,.94);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;display:grid;gap:12px}
+.erd-notes .bl{padding:0;background:none;box-shadow:none;font-size:24px;gap:12px;align-items:flex-start}
+.erd-notes .bl .bullet-l{margin-top:6px}
+
+/* ---------- DISEÑO DE PARTE 3 y 4 (tablas) ---------- */
+.two{position:absolute;left:0;right:0;top:148px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.rules{position:absolute;left:0;right:0;bottom:0;padding:22px 30px 24px}
+.rules h3{font-family:var(--font-pix);font-size:24px;color:var(--accent-l);margin-bottom:14px}
+.rules li{display:flex;align-items:center;gap:20px;font-size:30px;line-height:1.3;color:#fff;margin-top:10px}
+
+/* ---------- CONSULTAS ---------- */
+.strip{position:absolute;left:0;right:0;top:0;height:120px;display:flex;align-items:center;gap:26px;padding:0 24px 0 0;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;border-left:16px solid var(--accent)}
+.strip .pcard-title{margin:0;font-size:36px}
+.strip .timer{margin-left:auto}
+.qwrap{position:absolute;left:0;right:0;top:148px;bottom:0;display:grid;grid-template-columns:600px 1fr;gap:36px;min-height:0}
+.qlist{display:grid;grid-auto-rows:minmax(0,1fr);align-content:stretch;gap:12px;min-height:0}
+.rq{display:flex;align-items:center;gap:18px;padding:0 20px 0 16px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626;text-align:left;min-width:0;min-height:0}
+.rq.on{background:#1E1E1E;box-shadow:inset 0 0 0 4px var(--accent-l)}
+.rq:hover{background:#414141}
+.rq.on:hover{background:#1E1E1E}
+.qid{font-family:var(--font-display);font-size:24px;line-height:1;padding:12px 12px 10px;background:var(--accent);color:var(--on);flex:none}
+.rq-t{font-size:24px;line-height:1.2;font-weight:600;color:#fff;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.qpanel{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;overflow:hidden}
+.qpanel .code{flex:none}
+.qhead{display:flex;align-items:center;gap:20px;min-height:50px}
+.qhead .qid{font-size:24px;padding:14px 14px 12px}
+.qhead h3{font-size:28px;font-weight:700;line-height:1.2;color:#fff}
+.clauses{display:flex;flex-wrap:wrap;gap:10px}
+.cl{font-family:var(--font-pix);font-size:20px;padding:6px 10px 4px;background:#2b2b2b;color:var(--accent-l);box-shadow:inset 0 0 0 2px #444}
+.out{display:flex;flex-direction:column;gap:8px;min-height:0}
+.out-h{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-pix);font-size:20px;color:#C6C6C6}
+.inv{display:grid;gap:4px;overflow:hidden;font-size:22px}
+.inv2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;min-height:0}
+.inv div{padding:0 10px;height:36px;line-height:36px;font-family:var(--font-mono);font-size:inherit;background:#1E1E1E;box-shadow:inset 0 0 0 3px #3e3e3e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;min-width:0}
+.inv div.h{font-family:var(--font-pix);font-size:20px;background:#2b2b2b;color:var(--accent-l);box-shadow:inset 0 -3px 0 #141414,inset 0 0 0 3px #3e3e3e}
+
+/* ---------- EN VIVO (no cuenta en los 2:30) ---------- */
+.live-body{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;gap:14px}
+.live-body .out{flex:1;min-height:0}
+.live-body .inv div{height:40px;line-height:40px}
+.live-body .inv{gap:4px;font-size:24px}
+.live-top{display:flex;align-items:center;gap:22px}
+.live-badge{font-family:var(--font-pix);font-size:24px;padding:12px 18px 10px;background:var(--gold);color:#141414;box-shadow:inset -4px -4px 0 rgba(0,0,0,.25)}
+.live-who{font-size:30px;color:#E6E6E6}
+
+/* ---------- CIERRE ---------- */
+.closing{display:grid;grid-template-columns:1040px 1fr;gap:64px}
+.cl-l{display:flex;flex-direction:column;gap:26px;min-height:0}
+.cl-top{display:flex;align-items:center;gap:24px}
+.cl-top .timer{margin-left:auto}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.stat{display:grid;grid-template-columns:84px 1fr;gap:20px;align-items:center;padding:20px 24px;background:#373737;box-shadow:inset 0 0 0 4px #1E1E1E,inset 4px 4px 0 #5C5C5C,inset -4px -4px 0 #262626}
+.stat .px{width:84px;height:84px}
+.stat b{display:block;font-family:var(--font-display);font-weight:400;font-size:54px;line-height:1;color:var(--gold)}
+.stat span{display:block;margin-top:10px;font-family:var(--font-pix);font-size:24px;text-transform:uppercase;color:#fff}
+.stat small{display:block;margin-top:6px;font-size:24px;color:#D6D6D6}
+.concl{display:grid;gap:14px}
+.concl li{display:flex;align-items:center;gap:20px;padding:16px 22px;background:#2b2b2b;font-size:24px;line-height:1.25;color:#EDEDED}
+.cl-r{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:26px;position:relative;min-height:0}
+.thanks{font-family:var(--font-display);font-weight:400;font-size:54px;line-height:1.3;color:#fff;text-shadow:4px 4px 0 #1E1E1E,8px 8px 0 #0b0b0b}
+.team{font-size:30px;line-height:1.3;color:#EDEDED;max-width:600px;text-wrap:balance}
+.heads{display:flex;gap:40px;align-items:flex-end}
+.cl-credit{position:absolute;left:0;right:0;bottom:0;font-size:24px;line-height:1.3;color:#C6C6C6;text-align:left}
+
+/* ---------- lightbox (visor de figuras) ---------- */
+.lb{position:fixed;inset:0;z-index:100;display:none;background:rgba(6,6,6,.95)}
+.lb.on{display:block}
+.lb-vp{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.lb-vp.drag{cursor:grabbing}
+#lb-img{position:absolute;left:0;top:0;transform-origin:0 0;max-width:none;max-height:none;image-rendering:auto;-webkit-user-drag:none;user-select:none;box-shadow:0 0 0 4px #000}
+.lb-bar{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;background:#1E1E1E;box-shadow:inset 0 0 0 3px #3a3a3a;font-family:var(--font-pix);font-size:20px;color:#fff;white-space:nowrap;z-index:1}
+.lb-bar button{min-width:56px;height:56px;padding:0 14px;background:#373737;box-shadow:inset 0 0 0 3px #1E1E1E,inset 3px 3px 0 #5C5C5C;font-family:var(--font-pix);font-size:20px;color:#fff}
+.lb-bar button:hover{background:#414141}
+#lb-pct{min-width:200px;text-align:center}
+.lb-hint{color:#C6C6C6;font-size:20px;font-family:var(--font-body);margin:0 8px}
+
+/* ---------- créditos (C) ---------- */
+#credits{position:absolute;left:96px;right:96px;bottom:84px;display:none;padding:22px 32px;background:rgba(12,12,12,.95);box-shadow:inset 0 0 0 4px #000,inset 4px 4px 0 #3a3a3a;z-index:21;font-size:24px;line-height:1.3;color:#E6E6E6}
+#credits.on{display:block}
+#credits h5{margin:0 0 10px;font-family:var(--font-pix);font-size:20px;color:var(--accent-l);font-weight:700}
+#credits p{margin:0 0 8px}
+#credits a{color:var(--accent-l)}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
+
+/* ---------- PDF: una diapositiva por página, 1920x1080, sin controles ---------- */
+@page{size:1920px 1080px;margin:0}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;background:#1E1E1E!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  #deck{position:static!important;inset:auto!important;overflow:visible!important;height:auto!important}
+  #stage{position:static!important;transform:none!important;width:1920px!important;height:auto!important;overflow:visible!important;background:none!important}
+  .slide{position:relative!important;inset:auto!important;width:1920px!important;height:1080px!important;visibility:visible!important;opacity:1!important;transform:none!important;transition:none!important;animation:none!important;overflow:hidden!important;break-after:page;page-break-after:always}
+  .slide:last-of-type{break-after:auto;page-break-after:auto}
+  .hud,.foot,.notes,#credits,.lb,.timer,.hotbar,.seg2,.erd-top,.zoomable::after,button{display:none!important}
+  .cover-title span{animation:none!important}
+  .erd-fig{top:0!important}
+  .bg svg,.bg-photo{filter:none!important}
+  *{text-shadow:none!important}
+}
+</style>
+</head>
+<body>
+<div id="deck"><div id="stage"></div></div>
+<div id="lb" class="lb" aria-hidden="true">
+  <div class="lb-vp" id="lb-vp">
+    <img id="lb-img" alt="" draggable="false">
+  </div>
+  <div class="lb-bar">
+    <button type="button" data-lbz="out" aria-label="Alejar">−</button>
+    <span id="lb-pct">ajustar</span>
+    <button type="button" data-lbz="in" aria-label="Acercar">+</button>
+    <button type="button" data-lbz="fit">Ajustar</button>
+    <span class="lb-hint">rueda = zoom · arrastra = mover · Esc = cerrar</span>
+    <button type="button" data-lbz="close" aria-label="Cerrar">×</button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   DECK · contenido. Fuente: content.json (informe) y guion.md.
+   Minutos: 2:30 por persona (10:00 en total). Apertura en Gabriel,
+   cierre en Toledo. Los 2:30 son una propuesta para cumplir 10:00.
+   ========================================================================== */
+const LIMIT = 150; // 2:30 por persona, en segundos
+
+const DECK = {
+  event: {
+    titleLines: ['EL TÍO SAM', 'CHIFA'],
+    subtitle: 'Sistema de gestión para un restaurante chifa: prototipo web, MER y DER, Oracle y 20 consultas SQL',
+    course: 'Bases de Datos (SQL, Oracle) · Prof. S. Montoya · C24S 2.º ciclo · A-1 · 2026-II',
+    date: 'Noviembre de 2026',
+    school: 'Tecsup',
+    team: ['Angel Gabriel', 'Banda', 'Bustinza', 'Joseth Jhon Toledo Martinez']
+  },
+  stats: [
+    { v: 8,  label: 'tablas',        note: 'más 1 vista: v_resumen_dia', ico: 'crafting_table' },
+    { v: 37, label: 'restricciones', note: 'UNIQUE, CHECK y FK (sin PK)', ico: 'diamond' },
+    { v: 20, label: 'consultas',     note: 'SELECT, Q1 a Q20', ico: 'compass' },
+    { v: 30, label: 'cláusulas',     note: 'distintas, según el informe', ico: 'emerald' }
+  ],
+  parts: [
+    { n: 1, presenter: 'Gabriel', biome: 'Llanura', theme: 'plains', accent: '#5E9D34', light: '#9BD46B', on: '#141414', ico: 'grass_block',
+      title: 'La carta y la puerta de entrada', role: 'Prototipo, menu_platos y usuarios · Q1 a Q6', tables: ['menu_platos','usuarios'] },
+    { n: 2, presenter: 'Banda', biome: 'Océano', theme: 'ocean', accent: '#2F8FB8', light: '#7FD0EE', on: '#141414', ico: 'compass',
+      title: 'Quién compra y quién atiende', role: 'MER y DER, clientes y empleados · Q7 a Q12', tables: ['clientes','empleados'] },
+    { n: 3, presenter: 'Bustinza', biome: 'Desierto', theme: 'desert', accent: '#D9962B', light: '#F2B857', on: '#141414', ico: 'cooked_beef',
+      title: 'Mesas y pedidos del día a día', role: 'Mesas y pedidos · Q13 a Q17', tables: ['mesas','pedidos'] },
+    { n: 4, presenter: 'Toledo', biome: 'Mina', theme: 'cave', accent: '#8E5BD0', light: '#C3A2F0', on: '#FFFFFF', ico: 'diamond_pickaxe',
+      title: 'Del pedido al cobro', role: 'Detalle de pedido y pagos · Q18 a Q20', tables: ['detalle_pedido','pagos'] }
+  ],
+  // Tablas tal como las describe el informe (content.json). PK = id; FK = *_id.
+  // UQ: menu_platos.codigo, usuarios.usuario, clientes.dni, mesas.numero (texto del informe)
+  // y clientes.codigo, empleados.codigo, empleados.dni (marcados en la figura DER; ver notas).
+  tables: {
+    menu_platos: { fields: ['id','codigo','nombre','descripcion','categoria','precio','disponible'], uq: ['codigo'], ico: 'cake',
+      short: 'Platos de la carta. 12 de prueba.' },
+    usuarios: { fields: ['id','usuario','clave','rol','cliente_id','empleado_id','activo'], uq: ['usuario'], ico: 'diamond',
+      short: 'Acceso: cliente o empleado, nunca ambos.' },
+    clientes: { fields: ['id','codigo','nombre','dni','telefono','email','direccion'], uq: ['codigo','dni'], ico: 'bread',
+      short: 'Personas que compran. DNI de 8 dígitos.' },
+    empleados: { fields: ['id','codigo','nombre','dni','telefono','cargo','sueldo','fecha_ingreso','activo'], uq: ['codigo','dni'], ico: 'diamond_sword',
+      short: 'Personal. Cargo: 4 valores permitidos.' },
+    mesas: { fields: ['id','numero','capacidad','zona','estado'], uq: ['numero'], ico: 'crafting_table',
+      short: 'Mesas del local. Número único.' },
+    pedidos: { fields: ['id','cliente_id','empleado_id','mesa_id','fecha','modalidad','estado'], uq: [], ico: 'cooked_beef',
+      short: 'Cabecera del pedido. No guarda total.' },
+    detalle_pedido: { fields: ['id','pedido_id','plato_id','cantidad','precio_unitario'], uq: [], ico: 'redstone_dust',
+      short: 'Una línea por plato. UNIQUE (pedido, plato).' },
+    pagos: { fields: ['id','pedido_id','metodo','monto','fecha','estado'], uq: [], ico: 'gold_ingot',
+      short: 'Cobros del pedido por método.' }
+  },
+  queries: [
+    { id:'Q1', part:1, title:'Tipos de categoría que existen en la carta', clauses:['DISTINCT','ORDER BY'],
+      sql:"SELECT DISTINCT categoria\nFROM menu_platos\nORDER BY categoria;",
+      cols:['categoria'], rows:[['Dulces'],['Guarniciones'],['Platos Comunes'],['Platos Mixtos']] },
+    { id:'Q2', part:1, title:'Platos con precio entre S/ 20 y S/ 30, del más caro al más barato', clauses:['WHERE','BETWEEN','ORDER BY DESC'],
+      sql:"SELECT codigo, nombre, precio\nFROM menu_platos\nWHERE precio BETWEEN 20 AND 30\nORDER BY precio DESC;",
+      cols:['codigo','nombre','precio'], rows:[['CHI-004','Chaufa Mixto','29'],['CHI-005','Aeropuerto','27'],['CHI-002','Lomo Saltado','26'],['CHI-003','Tallarín Saltado','23'],['CHI-001','Arroz Chaufa','22']] },
+    { id:'Q3', part:1, title:'Platos «saltados» con el nombre en mayúsculas', clauses:['LIKE','UPPER'],
+      sql:"SELECT codigo, UPPER(nombre) AS plato, precio\nFROM menu_platos\nWHERE nombre LIKE '%Saltado%';",
+      cols:['codigo','plato','precio'], rows:[['CHI-002','LOMO SALTADO','26'],['CHI-003','TALLARÍN SALTADO','23']] },
+    { id:'Q4', part:1, title:'Empleados mozos o cajeros con sueldo desde S/ 1,300', clauses:['IN','AND','alias'],
+      sql:"SELECT codigo, nombre, cargo, sueldo AS sueldo_soles\nFROM empleados\nWHERE cargo IN ('Mozo','Cajero') AND sueldo >= 1300;",
+      cols:['codigo','nombre','cargo','sueldo_soles'], rows:[['E-002','Daniela Pérez Rojas','Mozo','1300'],['E-003','Kevin Huaman Soto','Cajero','1400'],['E-005','Rubén Choy Vargas','Mozo','1300']] },
+    { id:'Q5', part:1, title:'Etiqueta de cliente: nombre + código, inicio del DNI y largo del nombre', clauses:['Concatenación (||)','SUBSTR','LENGTH'],
+      sql:"SELECT nombre || ' (' || codigo || ')' AS cliente,\n       SUBSTR(dni, 1, 4) || '****' AS dni_oculto,\n       LENGTH(nombre) AS largo_nombre\nFROM clientes;",
+      cols:['cliente','dni_oculto','largo_nombre'], rows:[['María Quispe Flores (C-001)','4578****','19'],['Jorge Huamán Ríos (C-002)','4123****','17'],['Rosa Delgado Paredes (C-003)','0987****','20'],['Carlos Mendoza Vera (C-004)','4765****','19'],['Lucía Torres Campos (C-005)','4332****','19'],['Pedro Salas Gutiérrez (C-006)','0876****','21']] },
+    { id:'Q6', part:1, title:'Pedidos que no tienen mesa (para llevar o delivery)', clauses:['IS NULL','NVL'],
+      sql:"SELECT id, modalidad, NVL(mesa_id, 0) AS mesa\nFROM pedidos\nWHERE mesa_id IS NULL;",
+      cols:['id','modalidad','mesa'], rows:[['2','Para llevar','0'],['4','Para llevar','0'],['6','Delivery','0']] },
+
+    { id:'Q7', part:2, title:'Precio mínimo, máximo y promedio por categoría', clauses:['GROUP BY','MIN','MAX','AVG','ROUND'],
+      sql:"SELECT categoria,\n       MIN(precio) AS minimo,\n       MAX(precio) AS maximo,\n       ROUND(AVG(precio), 2) AS promedio\nFROM menu_platos\nGROUP BY categoria\nORDER BY categoria;",
+      cols:['categoria','minimo','maximo','promedio'], rows:[['Dulces','6','10','8'],['Guarniciones','6','12','9'],['Platos Comunes','22','26','23.67'],['Platos Mixtos','27','32','29.33']] },
+    { id:'Q8', part:2, title:'Categorías cuyo precio promedio supera S/ 15', clauses:['GROUP BY','HAVING','COUNT'],
+      sql:"SELECT categoria, COUNT(*) AS cantidad_platos,\n       ROUND(AVG(precio), 2) AS promedio\nFROM menu_platos\nGROUP BY categoria\nHAVING AVG(precio) > 15;",
+      cols:['categoria','cantidad_platos','promedio'], rows:[['Platos Comunes','3','23.67'],['Platos Mixtos','3','29.33']] },
+    { id:'Q9', part:2, title:'Clasificación de platos según su precio', clauses:['CASE'],
+      sql:"SELECT nombre, precio,\n       CASE WHEN precio < 10 THEN 'Económico'\n            WHEN precio < 25 THEN 'Estándar'\n            ELSE 'Premium' END AS rango\nFROM menu_platos\nORDER BY precio, nombre;",
+      cols:['nombre','precio','rango'], rows:[['Alfajor Chino','6','Económico'],['Arroz Blanco','6','Económico'],['Duraznos en Almíbar','8','Económico'],['Papas Fritas','9','Económico'],['Helado de Lúcuma','10','Estándar'],['Wantán Frito','12','Estándar'],['Arroz Chaufa','22','Estándar'],['Tallarín Saltado','23','Estándar'],['Lomo Saltado','26','Premium'],['Aeropuerto','27','Premium'],['Chaufa Mixto','29','Premium'],['Kam Lu Wantán','32','Premium']] },
+    { id:'Q10', part:2, title:'Pedidos con el nombre del cliente y del empleado que atendió', clauses:['INNER JOIN (2 uniones)'],
+      sql:"SELECT p.id AS pedido, c.nombre AS cliente,\n       e.nombre AS atendio, p.modalidad, p.estado\nFROM pedidos p\nINNER JOIN clientes c ON c.id = p.cliente_id\nINNER JOIN empleados e ON e.id = p.empleado_id\nORDER BY p.id;",
+      cols:['pedido','cliente','atendio','modalidad','estado'], rows:[['1','María Quispe Flores','Daniela Pérez Rojas','Mesa','Entregado'],['2','Jorge Huamán Ríos','Kevin Huaman Soto','Para llevar','Entregado'],['3','Carlos Mendoza Vera','Daniela Pérez Rojas','Mesa','En cocina'],['4','Lucía Torres Campos','Kevin Huaman Soto','Para llevar','Pendiente'],['5','Pedro Salas Gutiérrez','Rubén Choy Vargas','Mesa','Entregado'],['6','María Quispe Flores','Kevin Huaman Soto','Delivery','Entregado']] },
+    { id:'Q11', part:2, title:'Total de cada pedido calculado desde el detalle', clauses:['JOIN','SUM','GROUP BY'],
+      sql:"SELECT p.id AS pedido, c.nombre AS cliente,\n       SUM(d.cantidad * d.precio_unitario) AS total\nFROM pedidos p\nJOIN detalle_pedido d ON d.pedido_id = p.id\nJOIN clientes c ON c.id = p.cliente_id\nGROUP BY p.id, c.nombre\nORDER BY total DESC;",
+      cols:['pedido','cliente','total'], rows:[['3','Carlos Mendoza Vera','112'],['5','Pedro Salas Gutiérrez','68'],['1','María Quispe Flores','56'],['6','María Quispe Flores','40'],['2','Jorge Huamán Ríos','27'],['4','Lucía Torres Campos','23']] },
+    { id:'Q12', part:2, title:'Cantidad de pedidos por cliente (incluye quienes no pidieron)', clauses:['LEFT JOIN','COUNT'],
+      sql:"SELECT c.nombre, COUNT(p.id) AS pedidos\nFROM clientes c\nLEFT JOIN pedidos p ON p.cliente_id = c.id\nGROUP BY c.nombre\nORDER BY pedidos DESC, c.nombre;",
+      cols:['nombre','pedidos'], rows:[['María Quispe Flores','2'],['Carlos Mendoza Vera','1'],['Jorge Huamán Ríos','1'],['Lucía Torres Campos','1'],['Pedro Salas Gutiérrez','1'],['Rosa Delgado Paredes','0']] },
+
+    { id:'Q13', part:3, title:'Platos de la carta que nunca se han pedido', clauses:['LEFT JOIN','IS NULL'],
+      sql:"SELECT m.codigo, m.nombre\nFROM menu_platos m\nLEFT JOIN detalle_pedido d ON d.plato_id = m.id\nWHERE d.id IS NULL\nORDER BY m.codigo;",
+      cols:['codigo','nombre'], rows:[['CHI-006','Kam Lu Wantán'],['CHI-012','Alfajor Chino']] },
+    { id:'Q14', part:3, title:'Platos más caros que el precio promedio de la carta', clauses:['Subconsulta escalar'],
+      sql:"SELECT nombre, precio\nFROM menu_platos\nWHERE precio > (SELECT AVG(precio) FROM menu_platos)\nORDER BY precio DESC;",
+      cols:['nombre','precio'], rows:[['Kam Lu Wantán','32'],['Chaufa Mixto','29'],['Aeropuerto','27'],['Lomo Saltado','26'],['Tallarín Saltado','23'],['Arroz Chaufa','22']] },
+    { id:'Q15', part:3, title:'Clientes que tienen al menos un pedido entregado', clauses:['Subconsulta con IN'],
+      sql:"SELECT nombre, telefono\nFROM clientes\nWHERE id IN (SELECT cliente_id\n                FROM pedidos\n                WHERE estado = 'Entregado');",
+      cols:['nombre','telefono'], rows:[['María Quispe Flores','987 654 321'],['Jorge Huamán Ríos','945 231 876'],['Pedro Salas Gutiérrez','913 902 456']] },
+    { id:'Q16', part:3, title:'Empleados que han atendido pedidos', clauses:['EXISTS'],
+      sql:"SELECT e.nombre, e.cargo\nFROM empleados e\nWHERE EXISTS (SELECT 1\n              FROM pedidos p\n              WHERE p.empleado_id = e.id);",
+      cols:['nombre','cargo'], rows:[['Daniela Pérez Rojas','Mozo'],['Kevin Huaman Soto','Cajero'],['Rubén Choy Vargas','Mozo']] },
+    { id:'Q17', part:3, title:'Lista única de personas del sistema (clientes y empleados)', clauses:['UNION'],
+      sql:"SELECT nombre, 'Cliente' AS tipo FROM clientes\nUNION\nSELECT nombre, 'Empleado' FROM empleados\nORDER BY tipo, nombre;",
+      cols:['nombre','tipo'], rows:[['Carlos Mendoza Vera','Cliente'],['Jorge Huamán Ríos','Cliente'],['Lucía Torres Campos','Cliente'],['María Quispe Flores','Cliente'],['Pedro Salas Gutiérrez','Cliente'],['Rosa Delgado Paredes','Cliente'],['Daniela Pérez Rojas','Empleado'],['Kevin Huaman Soto','Empleado'],['Li Wong Tang','Empleado'],['Lian Zhang Rojas','Empleado'],['Rubén Choy Vargas','Empleado'],['Wilmer Chang Lau','Empleado']] },
+
+    { id:'Q18', part:4, title:'Empleados que todavía no han atendido ningún pedido', clauses:['MINUS'],
+      sql:"SELECT id, nombre FROM empleados\nMINUS\nSELECT e.id, e.nombre\nFROM empleados e\nJOIN pedidos p ON p.empleado_id = e.id;",
+      cols:['id','nombre'], rows:[['1','Wilmer Chang Lau'],['4','Li Wong Tang'],['6','Lian Zhang Rojas']] },
+    { id:'Q19', part:4, title:'Los 3 platos más vendidos (por unidades)', clauses:['JOIN','SUM','ORDER BY','FETCH FIRST'],
+      sql:"SELECT m.nombre, SUM(d.cantidad) AS unidades\nFROM detalle_pedido d\nJOIN menu_platos m ON m.id = d.plato_id\nGROUP BY m.nombre\nORDER BY unidades DESC, m.nombre\nFETCH FIRST 3 ROWS ONLY;",
+      cols:['nombre','unidades'], rows:[['Arroz Chaufa','3'],['Chaufa Mixto','3'],['Papas Fritas','3']] },
+    { id:'Q20', part:4, title:'Dinero cobrado por método de pago (solo pagos confirmados)', clauses:['WHERE','GROUP BY','SUM','COUNT'],
+      sql:"SELECT metodo, COUNT(*) AS pagos, SUM(monto) AS total_cobrado\nFROM pagos\nWHERE estado = 'Pagado'\nGROUP BY metodo\nORDER BY total_cobrado DESC;",
+      cols:['metodo','pagos','total_cobrado'], rows:[['Efectivo','2','96'],['Tarjeta','1','68'],['Yape/Plin','1','27']] }
+  ],
+  // Capturas del informe (img/). "view" = lo que se muestra en la diapositiva (recorte si existe);
+  // "file" = original, que abre el visor de zoom.
+  figs: {
+    proto: [
+      { file:'fig01-login.png', cap:'Figura 1. Inicio de sesión (tabla usuarios).', item:'emerald' },
+      { file:'fig02-catalogo.png', view:'recortes/fig02-catalogo-tabla.jpg', cap:'Figura 2. Catálogo de la carta (tabla menu_platos). Recorte; clic para ver completa.', item:'cooked_beef' },
+      { file:'fig03-modificar-plato.png', cap:'Figura 3. Modificar un plato, con validaciones.', item:'diamond_pickaxe' },
+      { file:'fig04-clientes.png', cap:'Figura 4. Mantenimiento de clientes.', item:'bread' },
+      { file:'fig05-pedidos.png', cap:'Figura 5. Pedidos: cliente, empleado, mesa, modalidad, estado y total.', item:'crafting_table' },
+      { file:'fig06-detalle.png', cap:'Figura 6. Detalle de pedido: platos, cantidades y precio unitario.', item:'cake' },
+      { file:'fig07-pagos.png', cap:'Figura 7. Pagos por método (Efectivo, Tarjeta, Yape/Plin).', item:'gold_ingot' },
+      { file:'fig08-resumen-dia.png', cap:'Figura 8. Resumen del día (vista v_resumen_dia).', item:'compass' },
+      { file:'fig09-sql.png', cap:'Figura 9. SQL de Oracle generado por las acciones del panel.', item:'redstone_dust' }
+    ],
+    mer: { file:'fig10-mer.png', cap:'Figura 10. Modelo Entidad-Relación (MER).' },
+    der: { file:'fig11-der.png', cap:'Figura 11. Diagrama Entidad-Relación (DER): 8 tablas con PK, FK y UQ.' }
+  },
+  // Consulta en vivo por persona (guion.md). Fuera de los 2:30.
+  live: { 1: 'Q2', 2: 'Q11', 3: 'Q13', 4: 'Q20' }
+};
+
+/* ==========================================================================
+   Utilidades y arte. Iconos: img/mc/item (Mojang, uso educativo; ver CREDITS.md)
+   ========================================================================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad2 = n => String(n).padStart(2, '0');
+const fmtT = s => `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+
+/* Icono de item: imagen 16x16 escalada a pixel, o recorte CSS para chest y xp */
+function ICON(name, cls = ''){
+  if (name === 'chest') return `<span class="chest ${cls}" aria-hidden="true"><i></i><b></b></span>`;
+  if (name === 'xp') return `<span class="xp-orb ${cls}" aria-hidden="true"></span>`;
+  return `<img class="px ${cls}" src="img/mc/item/${name}.png" alt="" aria-hidden="true">`;
+}
+/* Cara (8x8 en 8,8) de steve o villager, con capa de sombrero si existe, escalada en pixel */
+function headHTML(file, px = 112, hat = false){
+  const k = px / 8, bs = 64 * k;
+  const layers = hat ? `url(${file}), url(${file})` : `url(${file})`;
+  const pos = hat ? `-${40 * k}px -${8 * k}px, -${8 * k}px -${8 * k}px` : `-${8 * k}px -${8 * k}px`;
+  return `<span class="head" aria-hidden="true" style="width:${px}px;height:${px}px;background-image:${layers};background-size:${bs}px ${bs}px;background-position:${pos}"></span>`;
+}
+
+function pixelSVG(rows, pal, cls = 'px'){
+  const h = rows.length, w = Math.max(...rows.map(r => r.length));
+  let d = '';
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < w){
+      const ch = row[x];
+      if (!ch || ch === '.' || !pal[ch]) { x++; continue; }
+      let run = 1;
+      while (x + run < w && row[x + run] === ch) run++;
+      d += `<rect x="${x}" y="${y}" width="${run}" height="1" fill="${pal[ch]}"/>`;
+      x += run;
+    }
+  });
+  return `<svg class="${cls}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true">${d}</svg>`;
+}
+const LEAVES = ['LLLLLLL.....','LGGGGGGLL...','GGGLGGGGGL..','GGGGGGGGGGL.','.GGDGGGGGGG.','..GGGGDGGG..','...GGGGGG...','....GDG.....','.....G......'];
+const LEAVES_PAL = { L:'#4CAF50', G:'#5E9D34', D:'#2E5A1C' };
+
+const THEMES = {
+  plains: { sky:'linear-gradient(180deg,#2C4B6B 0%,#4F7393 60%,#7FA2B8 100%)', far:'#23431F', top:'#5E9D34', dirt:'#79553A', stone:'#5C5C5C', leaf:'#2E5A1C', trunk:'#4A3520', deco:'tree' },
+  ocean:  { sky:'linear-gradient(180deg,#14365A 0%,#2A6C94 100%)', far:'#1D4E6E', top:'#D8C48A', dirt:'#A88E55', stone:'#4F5D66', water:'#2F8FB8', waterY:15, deco:null },
+  desert: { sky:'linear-gradient(180deg,#5A2E3A 0%,#C56B33 55%,#F0B765 100%)', far:'#9C5F2E', top:'#D9B36C', dirt:'#B98C4E', stone:'#8A6A48', leaf:'#5E9D34', deco:'cactus' },
+  cave:   { sky:'linear-gradient(180deg,#120B1F 0%,#2C1B47 100%)', far:'#2A1C42', top:'#6B5F7A', dirt:'#4A3F59', stone:'#3A3146', leaf:'#8E5BD0', deco:'crystal' }
+};
+function landscape(key){
+  const T = THEMES[key] || THEMES.plains;
+  const W = 48, H = 27;
+  const cols = [], tops = [];
+  for (let x = 0; x < W; x++){
+    const col = new Array(H).fill(null);
+    const yNear = Math.round((1 - (0.50 + 0.09 * Math.sin(x * 0.29 + 1.2) + 0.04 * Math.sin(x * 0.91 + 0.4))) * H);
+    const yFar  = Math.round((1 - (0.40 + 0.07 * Math.sin(x * 0.17 + 2.6) + 0.03 * Math.sin(x * 0.6))) * H);
+    for (let y = yFar; y < yNear; y++) col[y] = T.far;
+    if (T.water) for (let y = T.waterY; y < yNear; y++) col[y] = T.water;
+    for (let y = yNear; y < H; y++) col[y] = y === yNear ? T.top : (y < yNear + 3 ? T.dirt : T.stone);
+    cols.push(col); tops.push(yNear);
+  }
+  for (let x = 0; x < W; x++){
+    const yn = tops[x];
+    if (T.deco === 'tree' && (x * 7 + 3) % 11 === 0 && yn > 7){
+      cols[x][yn - 1] = T.trunk; cols[x][yn - 2] = T.trunk;
+      for (const dx of [-1, 0, 1]) if (x + dx >= 0 && x + dx < W){
+        cols[x + dx][yn - 4] = T.leaf; cols[x + dx][yn - 3] = T.leaf;
+      }
+      cols[x][yn - 5] = T.leaf;
+    }
+    if (T.deco === 'cactus' && (x * 5 + 1) % 9 === 0 && yn > 5){
+      cols[x][yn - 1] = T.leaf; cols[x][yn - 2] = T.leaf; cols[x][yn - 3] = T.leaf;
+    }
+    if (T.deco === 'crystal' && (x * 5) % 7 === 0 && yn > 4){
+      cols[x][yn - 1] = T.leaf; cols[x][yn - 2] = T.leaf;
+    }
+  }
+  let d = '';
+  cols.forEach((col, x) => {
+    let y = 0;
+    while (y < H){
+      const c = col[y];
+      if (!c){ y++; continue; }
+      let e = y;
+      while (e < H && col[e] === c) e++;
+      d += `<rect x="${x}" y="${y}" width="1" height="${e - y}" fill="${c}"/>`;
+      y = e;
+    }
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" shape-rendering="crispEdges" aria-hidden="true">${d}</svg>`;
+}
+/* Foto de fondo (Mojang, ver CREDITS.md): 1920 px, JPEG. Solo para la llanura. */
+const MC_BG = { plains: 'img/mc/bg/landscape-above-mountains.jpg' };
+const bgHTML = theme => {
+  const T = THEMES[theme] || THEMES.plains;
+  const photo = MC_BG[theme] ? `<img class="bg-photo" src="${MC_BG[theme]}" alt="" aria-hidden="true" onerror="this.remove()">` : '';
+  return `<div class="bg" style="background:${T.sky}">${landscape(theme)}${photo}</div><div class="vig"></div>`;
+};
+
+/* ---------- resaltado SQL ---------- */
+const SQL_KW = new Set('SELECT FROM WHERE JOIN LEFT RIGHT INNER OUTER FULL ON AND OR NOT NULL IS IN LIKE BETWEEN AS GROUP BY ORDER HAVING DESC ASC DISTINCT INSERT INTO VALUES UPDATE SET DELETE COMMIT ROLLBACK CREATE TABLE ALTER ADD CONSTRAINT PRIMARY KEY FOREIGN REFERENCES UNIQUE CHECK DEFAULT CASE WHEN THEN ELSE END UNION MINUS ALL EXISTS LIMIT FETCH FIRST ROWS ONLY USING'.split(' '));
+const SQL_FN = new Set('COUNT SUM AVG MIN MAX NVL DECODE TO_CHAR TO_DATE SYSDATE ADD_MONTHS ROUND UPPER LOWER LENGTH SUBSTR REGEXP_LIKE'.split(' '));
+function sqlHL(src){
+  const re = /(--[^\n]*)|('(?:[^']|'')*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(src))){
+    out += esc(src.slice(last, m.index));
+    const t = m[0];
+    let cls;
+    if (m[1]) cls = 'com';
+    else if (m[2]) cls = 'str';
+    else if (m[3]) cls = 'num';
+    else { const U = t.toUpperCase(); cls = SQL_KW.has(U) ? 'kw' : SQL_FN.has(U) ? 'fn' : 'id'; }
+    out += `<span class="tk-${cls}">${esc(t)}</span>`;
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+
+/* ---------- componentes ---------- */
+function partVars(p){ return `--accent:${p.accent};--accent-l:${p.light};--on:${p.on}`; }
+const NEUTRAL = '--accent:#5E9D34;--accent-l:#9BD46B;--on:#141414';
+const partOf = n => DECK.parts[n - 1];
+
+function tableCard(name){
+  const t = DECK.tables[name];
+  const fields = t.fields.map(f => {
+    const badge = f === 'id' ? 'PK' : (/_id$/.test(f) ? 'FK' : (t.uq.includes(f) ? 'UQ' : ''));
+    return `<span class="fchip">${esc(f)}${badge ? `<i class="k k-${badge}">${badge}</i>` : ''}</span>`;
+  }).join('');
+  return `<article class="tcard stone">
+    <header class="tcard-h">${ICON(t.ico, 'tc-ico')}<div><h4>${esc(name)}</h4><p>${esc(t.short)}</p></div></header>
+    <div class="fields">${fields}</div>
+  </article>`;
+}
+
+function timerBtn(p){
+  return `<button type="button" class="timer" data-timer="${p.n}" aria-label="Cronómetro de ${esc(p.presenter)}, meta 2 minutos 30"><span class="t-min">META 2:30</span><span class="t-val">00:00</span></button>`;
+}
+function partCard(p){
+  return `<div class="pcard" style="${partVars(p)}">
+    <div class="pcard-ico">${ICON(p.ico)}</div>
+    <div class="pcard-txt">
+      <p class="pcard-chip">Parte ${p.n} · ${esc(p.biome)} · ${esc(p.presenter)}</p>
+      <h2 class="pcard-title">${esc(p.title)}</h2>
+    </div>
+    ${timerBtn(p)}
+  </div>`;
+}
+function stripCard(p){
+  const qs = DECK.queries.filter(q => q.part === p.n);
+  return `<div class="strip" style="${partVars(p)}">
+    <div class="pcard-ico" style="width:84px;height:84px">${ICON(p.ico)}</div>
+    <div class="pcard-txt">
+      <p class="pcard-chip">Parte ${p.n} · ${esc(p.presenter)} · consultas</p>
+      <h2 class="pcard-title" style="font-size:36px;margin-top:10px">${qs[0].id} a ${qs[qs.length - 1].id}</h2>
+    </div>
+    ${timerBtn(p)}
+  </div>`;
+}
+function railHTML(cartAt, lit){
+  const names = [['Mesa','crafting_table'],['Pedido','bread'],['Detalle','chest'],['Pago','gold_ingot']];
+  const pos = k => 12.5 + 25 * k;
+  return `<div class="rail" aria-label="Recorrido del pedido al pago">
+    <div class="track"></div>
+    ${names.map(([n, ic], k) => `<div class="station${lit.includes(k) ? ' lit' : ''}" style="left:${pos(k)}%"><span class="st-ico">${ICON(ic)}</span><span class="st-t">${n}</span></div>`).join('')}
+    <div class="cart" style="left:${pos(cartAt)}%"><svg viewBox="0 0 16 12" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="3" width="14" height="6" fill="#8A8A8A"/><rect x="1" y="3" width="14" height="2" fill="#B8B8B8"/><rect x="2" y="9" width="3" height="2" fill="#1E1E1E"/><rect x="11" y="9" width="3" height="2" fill="#1E1E1E"/></svg></div>
+  </div>`;
+}
+function bulletsHTML(items, icons){
+  return items.map((t, k) => `<li class="bl">${ICON(icons[k % icons.length], 'bullet-l')}<span>${esc(t)}</span></li>`).join('');
+}
+const BUL = ['emerald','diamond','redstone_dust','gold_ingot'];
+
+function shell(i, type, p, inner, theme, extraAttr = ''){
+  const vars = p ? partVars(p) : NEUTRAL;
+  return `<section class="slide s-${type}" data-i="${i}" data-type="${type}" data-part="${p ? p.n : ''}" style="${vars}" aria-label="Diapositiva ${i + 1}" ${extraAttr}>
+    ${theme ? bgHTML(theme) : ''}
+    ${inner}
+  </section>`;
+}
+
+/* ---------- diapositivas ---------- */
+function renderCover(i){
+  const E = DECK.event, p = partOf(1);
+  const tiles = DECK.parts.map(q => `
+    <li class="ag-t" data-gopart="${q.n}" style="${partVars(q)}" role="button" tabindex="0" aria-label="Ir a la parte ${q.n}">
+      ${ICON(q.ico)}
+      <div>
+        <span class="ag-who">${q.n} · ${esc(q.presenter)} · 2:30</span>
+        <h3>${esc(q.title)}</h3>
+        <span class="ag-note">${q.n === 1 ? 'Incluye apertura' : q.n === 4 ? 'Incluye cierre' : esc(q.role)}</span>
+      </div>
+    </li>`).join('');
+  return shell(i, 'cover', p, `
+    <div class="wrap">
+      <div class="cover-timer">${timerBtn(p)}</div>
+      <div class="cover-main">
+        <div class="cover-ico"><img src="img/mc/mob/creeper-face.jpg" alt="" aria-hidden="true"></div>
+        <h1 class="cover-title">${E.titleLines.map(l => `<span>${esc(l)}</span>`).join('')}</h1>
+        <p class="cover-sub">${esc(E.subtitle)}</p>
+        <p class="cover-course">${esc(E.course)}</p>
+        <p class="cover-team">${E.team.map(esc).join(' · ')} · ${esc(E.date)}</p>
+      </div>
+      <ol class="ag">${tiles}</ol>
+    </div>`, 'plains');
+}
+
+function renderProto(i, p){
+  const figs = DECK.figs.proto;
+  const hot = figs.map((f, k) => `<button type="button" class="slot${k === 1 ? ' on' : ''}" data-fig="${k}" aria-label="${esc(f.cap)}">${ICON(f.item)}<span class="slot-n">${k + 1}</span></button>`).join('');
+  const f0 = figs[1];
+  return shell(i, 'proto', p, `${bgHTML(p.theme)}
+    <div class="wrap">
+      ${partCard(p)}
+      <div class="proto">
+        <div class="pl">
+          <div class="hotbar" role="group" aria-label="Capturas del prototipo (1 a 9)">${hot}</div>
+          <figure class="shot-frame zoomable" id="shot-frame" data-full="img/${esc(f0.file)}" title="Clic para ampliar">
+            <img id="shot" class="fig-img" src="img/${esc(f0.view || f0.file)}" alt="${esc(f0.cap)}" onerror="this.closest('.shot-frame').classList.add('missing')">
+            <figcaption id="shot-cap">${esc(f0.cap)}</figcaption>
+          </figure>
+        </div>
+        <div class="side">
+          <p class="lbl">PUNTOS CLAVE</p>
+          <ul>${bulletsHTML(['Prototipo web clicable: carta, clientes, pedidos y pagos.','menu_platos: 12 platos de prueba en 4 categorías.','usuarios: cliente o empleado, nunca ambos.'], BUL)}</ul>
+        </div>
+      </div>
+    </div>`);
+}
+
+function renderErd(i, p){
+  const bullets = ['8 entidades y 8 tablas, con relaciones 1:N y FK.','clientes: DNI de 8 dígitos y único.','empleados: cargo solo Cocinero, Mozo, Cajero o Administrador.'];
+  return shell(i, 'erd', p, `${bgHTML(p.theme)}
+    <div class="wrap">
+      <div class="erd-top">
+        <div class="seg2" role="group" aria-label="Vista del modelo">
+          <button type="button" data-erd="mer" aria-pressed="false">MER</button>
+          <button type="button" data-erd="der" class="on" aria-pressed="true">DER</button>
+        </div>
+        <span class="erd-cap">Clic en la figura para ampliar</span>
+        ${timerBtn(p)}
+      </div>
+      <figure class="shot-frame erd-fig zoomable" id="erd-frame" data-full="img/${esc(DECK.figs.der.file)}">
+        <img id="erd-img" class="fig-img" src="img/${esc(DECK.figs.der.file)}" alt="${esc(DECK.figs.der.cap)}" onerror="this.closest('.shot-frame').classList.add('missing')">
+        <figcaption id="erd-cap-txt" style="position:absolute;left:0;bottom:-40px;margin:0;font-size:24px;background:rgba(20,20,20,.85);padding:4px 10px;color:#E6E6E6">${esc(DECK.figs.der.cap)}</figcaption>
+      </figure>
+      <aside class="erd-notes" aria-label="Puntos clave">
+        <ul>${bulletsHTML(bullets, ['emerald','diamond','redstone_dust'])}</ul>
+      </aside>
+    </div>`);
+}
+
+function renderTables(i, p, opts){
+  const tables = DECK.parts[p.n - 1].tables.map(tableCard).join('');
+  const rail = `<div style="position:absolute;left:0;right:0;top:${opts.railTop || 410}px">${railHTML(opts.cart, opts.lit)}</div>`;
+  return shell(i, 'tables', p, `${bgHTML(p.theme)}
+    <div class="wrap">
+      ${partCard(p)}
+      <div class="two">${tables}</div>
+      ${rail}
+      <section class="rules dark">
+        <h3>PUNTOS CLAVE</h3>
+        <ul>${opts.bullets.map((t, k) => `<li>${ICON(BUL[k % BUL.length], 'bullet-l')}<span>${esc(t)}</span></li>`).join('')}</ul>
+      </section>
+    </div>`);
+}
+
+function renderQueries(i, p){
+  const qs = DECK.queries.filter(q => q.part === p.n);
+  const list = qs.map((q, k) => `<button type="button" class="rq${k === 0 ? ' on' : ''}" data-q="${k}" aria-pressed="${k === 0}">
+      <span class="qid">${q.id}</span><span class="rq-t">${esc(q.title)}</span></button>`).join('');
+  return shell(i, 'queries', p, `${bgHTML(p.theme)}
+    <div class="wrap">
+      ${stripCard(p)}
+      <div class="qwrap">
+        <nav class="qlist" aria-label="Consultas de la parte"${qs.length < 5 ? ' style="grid-auto-rows:124px;align-content:start"' : ''}>${list}</nav>
+        <section class="qpanel" aria-live="polite"></section>
+      </div>
+    </div>`);
+}
+
+/* Panel de una consulta: encabezado, cláusulas, SQL y salida (la misma para parte y en vivo) */
+function panelHTML(q, big){
+  const invOf = rows => `<div class="inv" style="grid-template-columns:repeat(${q.cols.length},auto)">${q.cols.map(c => `<div class="h">${esc(c)}</div>`).join('')}${rows.map(r => r.map(v => `<div>${esc(v)}</div>`).join('')).join('')}</div>`;
+  // Con más de 6 filas la salida va en dos tablas lado a lado (cada una con su encabezado), para que quepa en la diapositiva
+  const half = Math.ceil(q.rows.length / 2);
+  const inv = q.rows.length > 6 ? `<div class="inv2">${invOf(q.rows.slice(0, half))}${invOf(q.rows.slice(half))}</div>` : invOf(q.rows);
+  return `<div class="qhead"><span class="qid">${q.id}</span><h3>${esc(q.title)}</h3></div>
+    <div class="clauses">${q.clauses.map(c => `<span class="cl">${esc(c)}</span>`).join('')}</div>
+    <pre class="code${big ? ' big' : ''}">${sqlHL(q.sql)}</pre>
+    <div class="out">
+      <div class="out-h"><span>SALIDA</span><span>${q.rows.length} fila${q.rows.length === 1 ? '' : 's'}</span></div>
+      ${inv}
+    </div>`;
+}
+
+/* Si una celda de salida se corta (texto más ancho que la columna), baja el tamaño de letra */
+function fitInv(root){
+  $$('.inv', root).forEach(el => {
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = '';
+    let n = 0;
+    const cut = () => [...el.children].some(c => c.scrollWidth > c.clientWidth + 1);
+    while (n < 6 && fs > 18 && cut()){ fs -= 1; el.style.fontSize = fs + 'px'; n++; }
+  });
+}
+function paintQuery(slideEl, k){
+  const p = partOf(+slideEl.dataset.part);
+  const qs = DECK.queries.filter(q => q.part === p.n);
+  const q = qs[k];
+  const panel = $('.qpanel', slideEl);
+  panel.innerHTML = panelHTML(q, false);
+  fitInv(panel);
+  $$('.rq', slideEl).forEach((b, j) => { b.classList.toggle('on', j === k); b.setAttribute('aria-pressed', j === k); });
+  slideEl.dataset.q = k;
+}
+
+function renderLive(i, p){
+  const q = DECK.queries.find(x => x.id === DECK.live[p.n]);
+  return shell(i, 'live', p, `${bgHTML(p.theme)}
+    <div class="wrap">
+      <div class="live-body">
+        <div class="live-top"><span class="live-badge">EN VIVO</span><span class="live-who">${esc(p.presenter)} · fuera de los 2:30</span></div>
+        ${panelHTML(q, true)}
+      </div>
+    </div>`);
+}
+
+function renderClosing(i){
+  const p = partOf(4);
+  const stats = DECK.stats.map(s => `<div class="stat">
+      ${ICON(s.ico)}
+      <div><b>${s.v}</b><span>${esc(s.label)}</span><small>${esc(s.note)}</small></div>
+    </div>`).join('');
+  const concl = [
+    'El modelo de 8 entidades cubre el ciclo completo de un restaurante.',
+    'UNIQUE, CHECK y FOREIGN KEY: Oracle rechaza DNI inválidos, precios negativos y mesas inexistentes.',
+    'Sin total guardado y con detalle N:M, no hay datos duplicados.'
+  ];
+  return shell(i, 'closing', p, `${bgHTML('plains')}
+    <div class="wrap closing">
+      <div class="cl-l">
+        <div class="cl-top"><h2 class="h-display">En números</h2>${timerBtn(p)}</div>
+        <div class="stat-grid">${stats}</div>
+        <ul class="concl">${concl.map(c => `<li>${ICON('xp', 'bullet-l')}<span>${esc(c)}</span></li>`).join('')}</ul>
+      </div>
+      <div class="cl-r">
+        <h2 class="thanks">¿Preguntas?</h2>
+        <p class="team">${DECK.event.team.map(n => `<span style="white-space:nowrap">${esc(n)}</span>`).join(' · ')}</p>
+        <div class="heads">${headHTML('img/mc/mob/steve.png', 120, true)}${headHTML('img/mc/mob/villager.png', 120, false)}</div>
+        <p class="cl-credit">Arte: Mojang Studios / Microsoft, uso educativo. Créditos: tecla C.</p>
+      </div>
+    </div>`);
+}
+
+/* ==========================================================================
+   Estructura: 14 diapositivas. Las 10 primeras van con cronómetro (2:30 por persona).
+   Las de "live" son consultas en vivo, fuera de los 2:30.
+   ========================================================================== */
+const PLAN = [
+  { type:'cover',   part:1 },
+  { type:'proto',   part:1 },
+  { type:'queries', part:1 },
+  { type:'erd',     part:2 },
+  { type:'queries', part:2 },
+  { type:'tables',  part:3, cart:1, lit:[0, 1], railTop:410, bullets:['mesas: número único, capacidad mayor que 0, 3 zonas.','pedidos: no guarda total; se calcula desde el detalle.','La mesa es obligatoria solo si la modalidad es Mesa.'] },
+  { type:'queries', part:3 },
+  { type:'tables',  part:4, cart:3, lit:[2, 3], railTop:410, bullets:['detalle_pedido: una línea por plato; precio_unitario queda como histórico.','pagos: Efectivo, Tarjeta o Yape/Plin; solo Pagado cuenta en Q20.','Q18 a Q20: MINUS, JOIN con SUM y WHERE con GROUP BY.'] },
+  { type:'queries', part:4 },
+  { type:'closing', part:4 },
+  { type:'live',    part:1, live:true },
+  { type:'live',    part:2, live:true },
+  { type:'live',    part:3, live:true },
+  { type:'live',    part:4, live:true }
+];
+const N = PLAN.length;
+
+/* Guion por persona (guion.md, acortado). Cada bloque ~130 palabras por minuto. Tope 330 palabras por persona. */
+const SPEECH = [
+  'Buenas. Somos Gabriel, Banda, Bustinza y Toledo. Les presentamos la base de datos de El Tío Sam Chifa, un restaurante chifa, hecha en Oracle. La base cubre el recorrido completo del negocio: alguien entra al sistema, mira la carta, hace un pedido y paga. Eso mismo seguiremos en la exposición, en cuatro partes. Yo empiezo con la carta y el acceso; Banda sigue con los diagramas; Bustinza, con mesas y pedidos; y Toledo cierra con el detalle y los pagos.',
+  'Empiezo por el prototipo: una página web clicable con nueve pantallas. Esta es la del catálogo, la carta del restaurante. Detrás hay dos tablas mías. menu_platos es la carta: doce platos de prueba, con código, nombre, categoría y precio. usuarios es el acceso: cada usuario es cliente o empleado, nunca los dos. La agregamos en la versión 2, porque la primera no tenía login.',
+  'Mis consultas van de la Q1 a la Q6: filtros, rangos, IN y valores nulos. La Q2 busca los platos entre S/ 20 y S/ 30, y salen cinco. La Q6 muestra los pedidos sin mesa, que son los de para llevar y delivery: el 2, el 4 y el 6. Ahora Banda les muestra cómo se conecta todo.',
+  'Yo reviso el modelo. El MER es el mapa del negocio: las entidades y sus relaciones. Un pedido pertenece a un cliente, lo atiende un empleado y puede tener una mesa. El DER baja ese mapa a tablas. Cada tabla tiene su llave primaria, el id, y sus llaves foráneas: pedidos.cliente_id apunta a clientes.id. Son 8 entidades y 8 tablas. clientes guarda el DNI, de 8 dígitos y único. empleados guarda el cargo, y por una restricción CHECK solo acepta Cocinero, Mozo, Cajero o Administrador.',
+  'Mis consultas son de la Q7 a la Q12. La Q7 saca el precio mínimo, máximo y promedio por categoría. La Q11 calcula el total de cada pedido: suma cantidad por precio unitario desde el detalle, así que ningún total queda guardado. La Q12 cuenta pedidos por cliente e incluye a quien no pidió nada. Ahora Bustinza explica mesas y pedidos.',
+  'Yo explico el centro del sistema. mesas guarda el número de mesa, que es único; hay tres zonas y tres estados. pedidos es la cabecera de cada pedido: quién compra, quién atiende, la fecha, la modalidad y el estado. Dos decisiones importantes. Primera: no guardamos el total. Se calcula sumando el detalle, así nunca queda desactualizado. Segunda: la mesa solo es obligatoria si el pedido es de modalidad Mesa. Los de para llevar no tienen mesa, y una restricción lo asegura.',
+  'Mis consultas son de la Q13 a la Q17. La Q13 muestra los platos que nunca se pidieron: Kam Lu Wantán y Alfajor Chino. La Q14 usa una subconsulta escalar, la Q15 un IN, la Q16 un EXISTS, y la Q17 junta clientes y empleados con UNION. Ahora Toledo cierra el recorrido del pedido.',
+  'Cierro el recorrido del pedido. detalle_pedido tiene una línea por plato dentro de cada pedido. Un plato no se repite en el mismo pedido, por la restricción UNIQUE; si piden dos porciones, va en la cantidad. Guardamos también precio_unitario, a propósito: el pedido conserva el precio cobrado aunque después cambie la carta. pagos guarda cada cobro ligado a su pedido, en efectivo, tarjeta o Yape/Plin.',
+  'Mis consultas son de la Q18 a la Q20. La Q18 usa MINUS para hallar a los empleados que todavía no han atendido ningún pedido. La Q19 muestra los platos más vendidos. La Q20 suma lo cobrado por método de pago, solo pagos confirmados: Efectivo S/ 96, Tarjeta S/ 68 y Yape/Plin S/ 27.',
+  'Para resumir: ocho tablas y una vista, 37 restricciones, 20 consultas y 30 cláusulas distintas, todo sobre el mismo esquema. El total sale del detalle y el precio queda como historial. Gracias. Ahora cada uno corre una consulta en vivo, y después respondemos preguntas.'
+];
+
+const NOTES = [
+  'GABRIEL · apertura y parte 1 · 2:30 en total.\n\n' + SPEECH[0] +
+    '\n\n[VERIFICAR] Los 2:30 por persona son una propuesta para cumplir los 10:00 del encargo. El informe no fija minutos.',
+  'GABRIEL · parte 1 (carta y acceso).\n\n' + SPEECH[1] +
+    '\n\n[VERIFICAR] El reparto decía prototipo en Figma con 5 pantallas (incluye registro). El informe describe una web HTML/CSS/JS con 9 capturas y sin registro. Confirmar qué se presenta. La figura 2 es un recorte del original: clic para verla completa. No decir que está conectado a Oracle en vivo hasta aclarar la API PHP que menciona la conclusión del informe.',
+  'GABRIEL · consultas Q1 a Q6. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[2] +
+    '\n\nConsulta en vivo de Gabriel: Q2, en la diapositiva 11. No cuenta en los 2:30.',
+  'BANDA · parte 2 (MER y DER).\n\n' + SPEECH[3] +
+    '\n\nTeclas M y D para alternar MER y DER. Clic en la figura para ampliar (rueda, arrastrar, Esc).\n[VERIFICAR] Las figuras 10 y 11 vienen de img/; confirmar que estén dentro del .docx.\n[VERIFICAR] UQ del DER: la figura marca UQ en clientes.codigo, empleados.codigo y empleados.dni. Las tarjetas se ajustaron a esa figura, que suma 8 UNIQUE como el conteo de content.json (7 simples y 1 compuesta). Confirmar contra el SQL de la sección 4.1 del informe.',
+  'BANDA · consultas Q7 a Q12. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[4] +
+    '\n\nConsulta en vivo de Banda: Q11, en la diapositiva 12. No cuenta en los 2:30.',
+  'BUSTINZA · parte 3 (mesas y pedidos).\n\n' + SPEECH[5],
+  'BUSTINZA · consultas Q13 a Q17. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[6] +
+    '\n\nConsulta en vivo de Bustinza: Q13, en la diapositiva 13. No cuenta en los 2:30.',
+  'TOLEDO · parte 4 (detalle y pagos).\n\n' + SPEECH[7] +
+    '\n\n[VERIFICAR] Normalización: el informe dice 3FN; el curso pedía hasta 2FN. precio_unitario es una decisión de diseño fuera de 3FN. Decidir qué decir si preguntan.',
+  'TOLEDO · consultas Q18 a Q20. Flechas ↑ ↓ cambian de consulta.\n\n' + SPEECH[8] +
+    '\n\nConsulta en vivo de Toledo: Q20, en la diapositiva 14. No cuenta en los 2:30.',
+  'TOLEDO · cierre (incluido en los 2:30 de Toledo).\n\n' + SPEECH[9] +
+    '\n\n[VERIFICAR] DEMO EN VIVO: quitada de la diapositiva. No viene en el informe y S/ 42 no sale de sus datos. Plan sin probar: INSERT de un pedido y su detalle (SQL real pendiente), COMMIT, SELECT p.id, d.cantidad, d.precio_unitario FROM pedidos p JOIN detalle_pedido d ON d.pedido_id = p.id, y SUM(cantidad * precio_unitario) = S/ 42. Probarla en Oracle antes de usarla.',
+  'EN VIVO · Gabriel · Q2. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
+  'EN VIVO · Banda · Q11. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
+  'EN VIVO · Bustinza · Q13. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.',
+  'EN VIVO · Toledo · Q20. Fuera de los 2:30.\n[VERIFICAR] Nunca ejecutada en Oracle 12c o superior. Tener captura de respaldo.'
+];
+
+/* ==========================================================================
+   Montaje
+   ========================================================================== */
+const stage = $('#stage');
+function build(){
+  const slidesHTML = PLAN.map((s, i) => {
+    const p = partOf(s.part);
+    switch (s.type){
+      case 'cover':   return renderCover(i);
+      case 'proto':   return renderProto(i, p);
+      case 'erd':     return renderErd(i, p);
+      case 'tables':  return renderTables(i, p, s);
+      case 'queries': return renderQueries(i, p);
+      case 'closing': return renderClosing(i);
+      case 'live':    return renderLive(i, p);
+    }
+    return '';
+  }).join('');
+
+  const hud = `<header class="hud">
+    <div class="logo"><img src="img/mc/item/grass_block.png" alt="" aria-hidden="true"><span class="logo-text">TÍO SAM CHIFA</span></div>
+    <nav class="tracker" aria-label="Partes de la exposición">
+      ${DECK.parts.map(p => `<button type="button" class="seg" data-part="${p.n}" style="${partVars(p)}" aria-label="Parte ${p.n}: ${esc(p.title)}">
+        <span class="seg-top">${p.n} · ${esc(p.biome)}</span>
+        <span class="seg-sub">${esc(p.presenter)} · 2:30</span>
+        <span class="seg-bar"><i></i></span>
+      </button>`).join('')}
+    </nav>
+    <button type="button" class="hud-cr" data-go="0" aria-label="Ir a la portada"><img src="img/mc/mob/creeper-face.jpg" alt="" aria-hidden="true"></button>
+  </header>`;
+
+  const foot = `<footer class="foot">
+    <span>Tecsup · ${esc(DECK.event.date)}</span>
+    <span class="hint">← → diapositivas · ↑ ↓ consultas · 1–4 partes · T cronómetro · N notas · C créditos · F pantalla completa</span>
+    <span id="count">1 / ${N}</span>
+  </footer>`;
+
+  const notes = `<aside id="notes" class="notes" aria-label="Notas del presentador">
+    <h5>NOTAS DEL PRESENTADOR · N para cerrar</h5>
+    <p id="notes-body"></p>
+  </aside>`;
+
+  const credits = `<aside id="credits" aria-label="Créditos de imágenes">
+    <h5>CRÉDITOS · C para cerrar</h5>
+    <p>Minecraft es marca y propiedad de Mojang Studios y Microsoft. Uso no comercial, con fines educativos.</p>
+    <p>Texturas de ítems y mobs (diamante, esmeralda, espada, pico, brújula, cofre, mesa de trabajo, bloque de hierba, redstone, comida, lingote de oro, orbe de XP, cara de steve y de villager): Mojang Studios, uso educativo. Cara de creeper: Mojang, dominio público (Wikimedia Commons).</p>
+    <p>Fondo de la llanura: captura de Minecraft (Above the Mountains), Mojang Studios, uso según las Minecraft Usage Guidelines.</p>
+    <p>Tipografía: Monocraft, de Idrees Hassan (SIL Open Font License 1.1). Enlace: github.com/IdreesInc/Monocraft. Enlaces y autores: img/mc/CREDITS.md</p>
+    <p>Figuras 1 a 11 y recortes: capturas del propio equipo (informe). Lista completa con enlaces, autores y licencias: img/mc/CREDITS.md</p>
+  </aside>`;
+
+  stage.innerHTML = slidesHTML + hud + foot + notes + credits;
+  slides = $$('.slide', stage);
+  $$('.s-queries', stage).forEach(el => paintQuery(el, 0));
+}
+
+/* ==========================================================================
+   Navegación y estado
+   ========================================================================== */
+let slides = [];
+let cur = 0;
+const timers = {1:0, 2:0, 3:0, 4:0};
+let runningPart = null, timerId = null;
+
+const partOfSlide = i => PLAN[i].part || null;
+function partStart(n){ return PLAN.findIndex(s => s.part === n); }
+function partLast(n){ let last = -1; PLAN.forEach((s, i) => { if (s.part === n) last = i; }); return last; }
+function partCount(n){ return PLAN.filter(s => s.part === n).length; }
+function partProgress(n){
+  const a = partStart(n), b = partLast(n);
+  if (cur < a) return 0;
+  if (cur >= b) return 1;
+  return (cur - a + 1) / partCount(n);
+}
+
+function updateChrome(){
+  slides.forEach((el, k) => {
+    el.classList.toggle('is-active', k === cur);
+    el.classList.toggle('is-past', k < cur);
+    el.setAttribute('aria-hidden', k !== cur ? 'true' : 'false');
+  });
+  const cp = partOfSlide(cur);
+  $$('.seg', stage).forEach(b => {
+    const n = +b.dataset.part;
+    b.classList.toggle('current', cp === n);
+    b.style.setProperty('--p', partProgress(n).toFixed(3));
+    if (cp === n) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+  });
+  $('#count').textContent = `${cur + 1} / ${N}`;
+  $('#notes-body').textContent = NOTES[cur] || '';
+  const vars = PLAN[cur].part ? partOf(PLAN[cur].part) : null;
+  stage.style.setProperty('--accent', vars ? vars.accent : '#5E9D34');
+  stage.style.setProperty('--accent-l', vars ? vars.light : '#9BD46B');
+  // Las consultas en vivo no cuentan: si el cronómetro corre, se pausa al llegar.
+  if (PLAN[cur].live && runningPart){ clearInterval(timerId); runningPart = null; }
+  paintTimers();
+  try { history.replaceState(null, '', '#' + (cur + 1)); } catch (e) {}
+}
+function go(i){
+  cur = Math.max(0, Math.min(N - 1, i));
+  updateChrome();
+}
+function goPart(n){ const k = partStart(n); if (k >= 0) go(k); }
+function isQuery(){ return PLAN[cur].type === 'queries'; }
+function stepQuery(d){
+  const el = slides[cur];
+  const total = DECK.queries.filter(q => q.part === PLAN[cur].part).length;
+  const k = Math.max(0, Math.min(total - 1, (+el.dataset.q || 0) + d));
+  paintQuery(el, k);
+}
+
+function paintTimers(){
+  $$('[data-timer]', stage).forEach(b => {
+    const p = +b.dataset.timer;
+    const s = timers[p];
+    $('.t-val', b).textContent = fmtT(s);
+    b.classList.toggle('over', s > LIMIT);
+    b.classList.toggle('running', runningPart === p);
+  });
+}
+function toggleTimer(p){
+  if (PLAN[cur].live) return;
+  if (runningPart === p){
+    clearInterval(timerId); runningPart = null;
+  } else {
+    if (timerId) clearInterval(timerId);
+    runningPart = p;
+    timerId = setInterval(() => { timers[p]++; paintTimers(); }, 1000);
+  }
+  paintTimers();
+}
+function toggleNotes(force){
+  const el = $('#notes');
+  const on = typeof force === 'boolean' ? force : !el.classList.contains('on');
+  el.classList.toggle('on', on);
+}
+function toggleCredits(force){
+  const el = $('#credits');
+  if (!el) return;
+  const on = typeof force === 'boolean' ? force : !el.classList.contains('on');
+  el.classList.toggle('on', on);
+}
+function toggleFS(){
+  try {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    else document.exitFullscreen().catch(() => {});
+  } catch (e) {}
+}
+function setErd(mode){
+  const el = slides[cur];
+  if (el.dataset.type !== 'erd') return;
+  const f = mode === 'mer' ? DECK.figs.mer : DECK.figs.der;
+  const img = $('#erd-img'), frame = $('#erd-frame');
+  img.src = 'img/' + f.file; img.alt = f.cap;
+  frame.dataset.full = 'img/' + f.file;
+  $('#erd-cap-txt', el).textContent = f.cap;
+  frame.classList.remove('missing');
+  $$('[data-erd]', el).forEach(b => {
+    const on = b.dataset.erd === mode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+function selectFig(k){
+  const el = slides[cur];
+  if (el.dataset.type !== 'proto') return;
+  const f = DECK.figs.proto[k];
+  $$('.slot', el).forEach((s, j) => s.classList.toggle('on', j === k));
+  const img = $('#shot', el);
+  img.src = 'img/' + (f.view || f.file); img.alt = f.cap;
+  $('#shot-cap', el).textContent = f.cap;
+  const frame = $('#shot-frame', el);
+  frame.dataset.full = 'img/' + f.file;
+  frame.classList.remove('missing');
+}
+
+/* ==========================================================================
+   Visor de figuras (lightbox): imagen original, rueda, arrastre, pinza, dobles clic
+   ========================================================================== */
+const LB = { open:false, s:1, fit:1, tx:0, ty:0, nw:0, nh:0, pts:new Map(), last:null, moved:0 };
+const lbEl = $('#lb'), lbVp = $('#lb-vp'), lbImg = $('#lb-img'), lbPct = $('#lb-pct');
+function lbApply(){
+  lbImg.style.transform = `translate(${LB.tx}px, ${LB.ty}px) scale(${LB.s})`;
+  const isFit = Math.abs(LB.s - LB.fit) < 1e-3;
+  lbPct.textContent = Math.round(LB.s * 100) + '%';
+}
+function lbFit(){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  LB.fit = Math.min(vw * 0.94 / LB.nw, vh * 0.86 / LB.nh);
+  LB.s = LB.fit;
+  LB.tx = (vw - LB.nw * LB.s) / 2;
+  LB.ty = (vh - LB.nh * LB.s) / 2;
+  lbApply();
+}
+function lbZoomAt(px, py, f){
+  const ns = Math.max(0.05, Math.min(12, LB.s * f));
+  const r = ns / LB.s;
+  LB.tx = px - (px - LB.tx) * r;
+  LB.ty = py - (py - LB.ty) * r;
+  LB.s = ns;
+  lbApply();
+}
+function openViewer(src, cap){
+  if (!src) return;
+  LB.open = true;
+  lbEl.classList.add('on');
+  lbEl.setAttribute('aria-hidden', 'false');
+  lbImg.alt = cap || '';
+  const ready = () => {
+    LB.nw = lbImg.naturalWidth; LB.nh = lbImg.naturalHeight;
+    lbImg.style.width = LB.nw + 'px';
+    lbImg.style.height = LB.nh + 'px';
+    lbFit();
+  };
+  lbImg.onload = ready;
+  if (lbImg.getAttribute('src') === src && lbImg.complete && lbImg.naturalWidth){ ready(); }
+  else { lbImg.src = src; }
+}
+function closeViewer(){
+  LB.open = false;
+  LB.pts.clear(); LB.last = null;
+  lbEl.classList.remove('on');
+  lbEl.setAttribute('aria-hidden', 'true');
+}
+lbVp.addEventListener('wheel', e => {
+  if (!LB.open) return;
+  e.preventDefault();
+  lbZoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+}, { passive: false });
+lbVp.addEventListener('pointerdown', e => {
+  LB.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  LB.moved = 0; LB.last = null;
+  try { lbVp.setPointerCapture(e.pointerId); } catch (err) {}
+  lbVp.classList.add('drag');
+});
+lbVp.addEventListener('pointermove', e => {
+  if (!LB.pts.has(e.pointerId)) return;
+  const prev = LB.pts.get(e.pointerId);
+  LB.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (LB.pts.size === 1){
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    LB.tx += dx; LB.ty += dy;
+    LB.moved += Math.abs(dx) + Math.abs(dy);
+    lbApply();
+  } else if (LB.pts.size >= 2){
+    const [a, b] = [...LB.pts.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    if (LB.last){
+      lbZoomAt(LB.last.mx, LB.last.my, d / LB.last.d);
+      LB.tx += mx - LB.last.mx; LB.ty += my - LB.last.my;
+      LB.moved += 10;
+      lbApply();
+    }
+    LB.last = { d, mx, my };
+  }
+});
+function lbPointerEnd(e){
+  LB.pts.delete(e.pointerId);
+  LB.last = null;
+  if (LB.pts.size === 0) lbVp.classList.remove('drag');
+}
+lbVp.addEventListener('pointerup', lbPointerEnd);
+lbVp.addEventListener('pointercancel', lbPointerEnd);
+lbVp.addEventListener('dblclick', e => {
+  if (!LB.open) return;
+  if (Math.abs(LB.s - LB.fit) < 1e-3) lbZoomAt(e.clientX, e.clientY, 1 / LB.s);
+  else lbFit();
+});
+lbEl.addEventListener('click', e => {
+  if (e.target === lbEl || e.target === lbVp){
+    if (LB.moved < 6) closeViewer();
+  }
+});
+$$('[data-lbz]', lbEl).forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation();
+  const a = b.dataset.lbz;
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  if (a === 'in') lbZoomAt(cx, cy, 1.25);
+  else if (a === 'out') lbZoomAt(cx, cy, 0.8);
+  else if (a === 'fit') lbFit();
+  else if (a === 'close') closeViewer();
+}));
+
+/* ==========================================================================
+   Eventos del deck
+   ========================================================================== */
+stage.addEventListener('click', e => {
+  const zm = e.target.closest('.zoomable');
+  if (zm){ openViewer(zm.dataset.full, zm.querySelector('img') ? zm.querySelector('img').alt : ''); return; }
+  const seg = e.target.closest('.seg');
+  if (seg){ goPart(+seg.dataset.part); seg.blur(); return; }
+  const bar = e.target.closest('[data-gopart]');
+  if (bar){ goPart(+bar.dataset.gopart); return; }
+  const go0 = e.target.closest('[data-go]');
+  if (go0){ go(+go0.dataset.go); go0.blur(); return; }
+  const t = e.target.closest('[data-timer]');
+  if (t){ toggleTimer(+t.dataset.timer); return; }
+  const slot = e.target.closest('.slot');
+  if (slot){ selectFig(+slot.dataset.fig); return; }
+  const erd = e.target.closest('[data-erd]');
+  if (erd){ setErd(erd.dataset.erd); return; }
+  const rq = e.target.closest('.rq');
+  if (rq){
+    const k = +rq.dataset.q;
+    paintQuery(slides[cur], k);
+    return;
+  }
+});
+stage.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-gopart]')){ e.preventDefault(); goPart(+e.target.dataset.gopart); }
+});
+
+/* Gestos táctiles (solo fuera del visor) */
+let tx = null, ty = null;
+stage.addEventListener('touchstart', e => {
+  if (e.target.closest('button,.notes')) { tx = null; return; }
+  tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+}, { passive: true });
+stage.addEventListener('touchend', e => {
+  if (tx === null) return;
+  const dx = e.changedTouches[0].clientX - tx;
+  const dy = e.changedTouches[0].clientY - ty;
+  tx = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5){
+    dx < 0 ? go(cur + 1) : go(cur - 1);
+  }
+}, { passive: true });
+
+/* Teclado. Con el visor abierto, las flechas mueven la imagen y no cambian de diapositiva. */
+document.addEventListener('keydown', e => {
+  if (LB.open){
+    const step = 60;
+    switch (e.key){
+      case 'Escape': closeViewer(); break;
+      case '+': case '=': lbZoomAt(window.innerWidth / 2, window.innerHeight / 2, 1.25); break;
+      case '-': case '_': lbZoomAt(window.innerWidth / 2, window.innerHeight / 2, 0.8); break;
+      case '0': lbFit(); break;
+      case 'ArrowLeft': LB.tx += step; lbApply(); break;
+      case 'ArrowRight': LB.tx -= step; lbApply(); break;
+      case 'ArrowUp': LB.ty += step; lbApply(); break;
+      case 'ArrowDown': LB.ty -= step; lbApply(); break;
+    }
+    e.preventDefault();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  switch (e.key){
+    case 'ArrowRight': case 'PageDown': case ' ':
+      e.preventDefault(); go(cur + 1); break;
+    case 'ArrowLeft': case 'PageUp':
+      e.preventDefault(); go(cur - 1); break;
+    case 'ArrowDown':
+      e.preventDefault(); if (isQuery()) stepQuery(1); else go(cur + 1); break;
+    case 'ArrowUp':
+      e.preventDefault(); if (isQuery()) stepQuery(-1); else go(cur - 1); break;
+    case 'Home': go(0); break;
+    case 'End': go(N - 1); break;
+    case 'n': case 'N': toggleNotes(); break;
+    case 'Escape': toggleNotes(false); toggleCredits(false); break;
+    case 'c': case 'C': toggleCredits(); break;
+    case 'f': case 'F': toggleFS(); break;
+    case 't': case 'T': { const p = partOfSlide(cur); if (p) toggleTimer(p); break; }
+    case 'm': case 'M': setErd('mer'); break;
+    case 'd': case 'D': setErd('der'); break;
+    default:
+      if (/^[1-4]$/.test(e.key)) goPart(+e.key);
+  }
+});
+
+/* Escala del escenario 16:9 */
+function fit(){
+  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.documentElement.style.setProperty('--s', s);
+}
+window.addEventListener('resize', fit);
+window.addEventListener('hashchange', () => {
+  const h = parseInt((location.hash || '').slice(1), 10);
+  if (Number.isFinite(h)) go(h - 1);
+});
+
+/* Al cargar las fuentes cambian las medidas: se revisan las celdas de salida */
+function fitAll(){ $$('.s-queries .qpanel, .s-live .live-body', stage).forEach(el => fitInv(el)); }
+
+build();
+fit();
+const startHash = parseInt((location.hash || '').slice(1), 10);
+go(Number.isFinite(startHash) ? startHash - 1 : 0);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
+</script>
+</body>
+</html>
